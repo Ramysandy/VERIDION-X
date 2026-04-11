@@ -27,9 +27,18 @@ export default function Navigation() {
             ⚡ VERIDION-X
           </Heading>
           <HStack spacing={4}>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate('/leaderboard')}
+              color="brand.dark"
+              _hover={{ color: 'brand.accent' }}
+            >
+              Hall of Shame
+            </Button>
             {claim && (
-              <Button 
-                variant="ghost" 
+              <Button
+                variant="ghost"
                 onClick={handleNewAudit}
                 color="brand.dark"
                 _hover={{ color: 'brand.accent' }}

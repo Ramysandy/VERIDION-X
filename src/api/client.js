@@ -65,12 +65,13 @@ export const epaAPI = {
  * Groq API Endpoints (LLM)
  */
 export const groqAPI = {
-  analyzeClaim: async (company, claim, eiaData, epaData) => {
+  analyzeClaim: async (company, claim, eiaData, epaData, secData) => {
     const response = await apiClient.post('/groq/analyze', {
       company,
       claim,
       eiaData,
-      epaData
+      epaData,
+      secData,
     })
     return response.data
   },
@@ -99,6 +100,16 @@ export const firecrawlAPI = {
       company,
       content
     })
+    return response.data
+  }
+}
+
+/**
+ * SEC EDGAR API Endpoints
+ */
+export const secAPI = {
+  getFilings: async (company) => {
+    const response = await apiClient.post('/sec/filings', { company })
     return response.data
   }
 }

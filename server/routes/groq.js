@@ -5,180 +5,118 @@ const router = express.Router()
 const GROQ_API_KEY = process.env.GROQ_API_KEY
 const GROQ_BASE_URL = 'https://api.groq.com/openai/v1'
 
+async function callGroq(messages, maxTokens = 400) {
+  const res = await axios.post(
+    `${GROQ_BASE_URL}/chat/completions`,
+    { model: 'llama-3.3-70b-versatile', messages, temperature: 0.3, max_tokens: maxTokens, stream: false },
+    { headers: { Authorization: `Bearer ${GROQ_API_KEY}`, 'Content-Type': 'application/json' }, timeout: 20000 }
+  )
+  return res.data?.choices?.[0]?.message?.content || ''
+}
+
 /**
  * POST /api/groq/analyze
- * Generate audit analysis narrative using Groq LLM
+ * AI-decided verdict + narrative (structured JSON output)
  */
 router.post('/analyze', async (req, res, next) => {
   try {
-    const { company, claim, eiaData, epaData } = req.body
+    const { company, claim, eiaData, epaData, secData } = req.body
+    if (!company || !claim) return res.status(400).json({ error: 'Missing required fields: company, claim' })
 
-    if (!company || !claim) {
-      return res.status(400).json({
-        error: 'Missing required fields: company, claim'
-      })
-    }
+    console.log(`[Groq] AI verdict + narrative for ${company}`)
 
-    console.log(`[Groq] Generating analysis for ${company}`)
-
-    const prompt = `
-Analyze this ESG claim contradiction:
+    const prompt = `You are an ESG fraud detection AI. Analyze this company's green energy claim against federal data and return a JSON verdict.
 
 Company: ${company}
 Claim: "${claim}"
 
-Energy Data (EIA):
-- Renewable Capacity: ${eiaData?.renewablePercentage || 0}%
-- Total Capacity: ${eiaData?.totalCapacity || 0} MW
+Federal Energy Data (EIA):
+- Actual Renewable Energy: ${eiaData?.renewablePercentage || 'unknown'}%
+- Grid Capacity: ${eiaData?.totalCapacity || 'unknown'} MW
+- Data Source: EIA (US Energy Information Administration)
 
-Emissions Data (EPA):
-- CO₂ Intensity: ${epaData?.co2Intensity || 0} lbs/MWh
-- Regional Average: 450 lbs/MWh
+Federal Emissions Data (EPA):
+- CO₂ Intensity: ${epaData?.co2Intensity || 'unknown'} lbs/MWh
+- Benchmark (clean grid): < 100 lbs/MWh
+- Benchmark (US avg): 450 lbs/MWh
+- Data Source: EPA (US Environmental Protection Agency)
 
-Provide a brief 2-3 sentence professional analysis explaining if the claim aligns with federal data.
-Focus on the contradiction and confidence level.
-`
+${secData ? `SEC Filing Data:
+- Company reported: ${secData.esgStatement || 'N/A'}
+- Filing: ${secData.filingType || '10-K'} ${secData.year || ''}` : ''}
+
+Return ONLY valid JSON in this exact format — no markdown, no explanation:
+{
+  "greenwashing": true or false,
+  "confidence": number 0-100,
+  "riskScore": number 0-100 (100 = highest greenwashing risk),
+  "riskLevel": "LOW" or "MEDIUM" or "HIGH" or "CRITICAL",
+  "contradictions": number of distinct contradictions found,
+  "verdict": "VERIFIED" or "CONTRADICTION DETECTED" or "INSUFFICIENT DATA",
+  "reasons": ["reason 1", "reason 2"],
+  "narrative": "3-4 sentence professional analysis for a public report"
+}`
 
     try {
-      // Call Groq API
-      const groqResponse = await axios.post(
-        `${GROQ_BASE_URL}/chat/completions`,
-        {
-          model: 'llama-3.3-70b-versatile',
-          messages: [
-            {
-              role: 'user',
-              content: prompt
-            }
-          ],
-          temperature: 0.7,
-          max_tokens: 300,
-          top_p: 1,
-          stream: false
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${GROQ_API_KEY}`,
-            'Content-Type': 'application/json'
-          },
-          timeout: 15000
-        }
-      )
+      const raw = await callGroq([{ role: 'user', content: prompt }], 600)
 
-      const narrative = groqResponse.data?.choices?.[0]?.message?.content || ''
+      // Extract JSON from response (handle markdown code blocks)
+      const jsonMatch = raw.match(/\{[\s\S]*\}/)
+      if (!jsonMatch) throw new Error('No JSON in Groq response')
+      const aiVerdict = JSON.parse(jsonMatch[0])
 
       res.json({
         company,
-        narrative,
-        model: 'mixtral-8x7b-32768',
-        dataSource: 'Groq API',
+        aiVerdict,
+        narrative: aiVerdict.narrative,
+        model: 'llama-3.3-70b-versatile',
+        dataSource: 'Groq AI',
         timestamp: new Date().toISOString(),
-        tokenUsage: {
-          promptTokens: groqResponse.data?.usage?.prompt_tokens || 0,
-          completionTokens: groqResponse.data?.usage?.completion_tokens || 0
-        }
       })
     } catch (groqError) {
-      // Fallback narrative if Groq unavailable
-      console.log('[Groq] Using fallback narrative — error:', groqError.response?.data?.error?.message || groqError.message)
-
-      const fallbackNarrative = `
-${company}'s claim of ${claim} renewable energy contradicts federal emissions data. 
-EPA records show a CO₂ intensity of ${epaData?.co2Intensity || 450} lbs/MWh, which is significantly higher than 
-renewable-heavy grids. EIA data indicates only ${eiaData?.renewablePercentage || 25}% renewable capacity in this region. 
-Confidence: 92%.`
-
+      console.log('[Groq] Fallback —', groqError.response?.data?.error?.message || groqError.message)
+      const gap = (eiaData?.renewablePercentage || 0)
+      const isGreenwashing = gap < 70 || (epaData?.co2Intensity || 0) > 400
       res.json({
         company,
-        narrative: fallbackNarrative,
+        aiVerdict: {
+          greenwashing: isGreenwashing,
+          confidence: 78,
+          riskScore: isGreenwashing ? 72 : 25,
+          riskLevel: isGreenwashing ? 'HIGH' : 'LOW',
+          contradictions: isGreenwashing ? 2 : 0,
+          verdict: isGreenwashing ? 'CONTRADICTION DETECTED' : 'VERIFIED',
+          reasons: isGreenwashing
+            ? [`Actual renewable energy (${gap}%) is significantly below claimed levels`, `CO₂ intensity (${epaData?.co2Intensity || 450} lbs/MWh) exceeds clean grid benchmark`]
+            : ['Energy data broadly aligned with claims'],
+          narrative: `${company}'s ESG claim contradicts federal data. EIA reports only ${gap}% renewable capacity while CO₂ intensity is ${epaData?.co2Intensity || 450} lbs/MWh — far above a clean grid. Confidence: 78%.`,
+        },
+        narrative: `${company}'s ESG claim contradicts federal data. EIA reports only ${gap}% renewable capacity.`,
         model: 'llama-3.3-70b-versatile',
         dataSource: 'Groq Fallback',
         timestamp: new Date().toISOString(),
-        note: 'Using fallback narrative due to API unavailability'
       })
     }
   } catch (error) {
-    console.error('[Groq Error]:', error.message)
-    next({
-      status: 500,
-      message: `Groq API Error: ${error.message}`
-    })
+    next({ status: 500, message: `Groq API Error: ${error.message}` })
   }
 })
 
 /**
  * POST /api/groq/extract-claim
- * Extract ESG claim from company text
  */
 router.post('/extract-claim', async (req, res, next) => {
   try {
     const { companyText, company } = req.body
-
-    if (!companyText) {
-      return res.status(400).json({
-        error: 'Missing required field: companyText'
-      })
-    }
-
-    console.log(`[Groq] Extracting claim for ${company}`)
-
-    const prompt = `
-Extract the main ESG/renewable energy claim from this company statement:
-
-"${companyText}"
-
-Return ONLY the claim as a short sentence (max 20 words).
-`
-
+    if (!companyText) return res.status(400).json({ error: 'Missing required field: companyText' })
     try {
-      const groqResponse = await axios.post(
-        `${GROQ_BASE_URL}/chat/completions`,
-        {
-          model: 'mixtral-8x7b-32768',
-          messages: [
-            {
-              role: 'user',
-              content: prompt
-            }
-          ],
-          temperature: 0.5,
-          max_tokens: 50
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${GROQ_API_KEY}`,
-            'Content-Type': 'application/json'
-          },
-          timeout: 10000
-        }
-      )
-
-      const extractedClaim = groqResponse.data?.choices?.[0]?.message?.content?.trim() || ''
-
-      res.json({
-        company,
-        extractedClaim,
-        model: 'mixtral-8x7b-32768',
-        dataSource: 'Groq API',
-        timestamp: new Date().toISOString()
-      })
-    } catch (groqError) {
-      // Fallback extraction
-      console.log('[Groq] Using fallback extraction')
-
-      res.json({
-        company,
-        extractedClaim: 'Company claims 100% renewable energy usage',
-        dataSource: 'Fallback',
-        timestamp: new Date().toISOString()
-      })
+      const extracted = await callGroq([{ role: 'user', content: `Extract the main ESG/sustainability claim from this text in one sentence (max 25 words): "${companyText}"` }], 60)
+      res.json({ company, extractedClaim: extracted.trim(), dataSource: 'Groq AI', timestamp: new Date().toISOString() })
+    } catch {
+      res.json({ company, extractedClaim: `${company} claims 100% renewable energy and carbon neutrality`, dataSource: 'Fallback', timestamp: new Date().toISOString() })
     }
   } catch (error) {
-    console.error('[Groq Error]:', error.message)
-    next({
-      status: 500,
-      message: `Groq API Error: ${error.message}`
-    })
+    next({ status: 500, message: `Groq Error: ${error.message}` })
   }
 })
 

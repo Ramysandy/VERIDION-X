@@ -5,6 +5,7 @@ import theme from './theme'
 import LandingPage from './pages/LandingPage'
 import AuditFlowPage from './pages/AuditFlowPage'
 import ResultsPage from './pages/ResultsPage'
+import LeaderboardPage from './pages/LeaderboardPage'
 import Navigation from './components/Navigation'
 import { useAuditStore } from './store/auditStore'
 
@@ -30,6 +31,7 @@ function AppContent() {
           <Route path="/" element={<LandingPage />} />
           <Route path="/audit" element={claim ? <AuditFlowPage /> : <LandingPage />} />
           <Route path="/results" element={showResults && claim ? <ResultsPage /> : <LandingPage />} />
+          <Route path="/leaderboard" element={<LeaderboardPage />} />
           <Route path="*" element={<LandingPage />} />
         </Routes>
       </VStack>

@@ -13,8 +13,8 @@ router.post('/renewable', async (req, res, next) => {
   try {
     const { state = 'CA', company } = req.body
 
-    // EIA API endpoint for renewable data
-    const facetsUrl = `${EIA_BASE_URL}/electricity/facility/?state=${state}&data[]=nameplate_capacity&frequency=monthly&sort[0][column]=period&sort[0][direction]=desc&length=1&api_key_token=${EIA_API_KEY}`
+    // EIA API endpoint — api_key param (not api_key_token)
+    const facetsUrl = `${EIA_BASE_URL}/electricity/facility/?state=${state}&data[]=nameplate_capacity&frequency=monthly&sort[0][column]=period&sort[0][direction]=desc&length=10&api_key=${EIA_API_KEY}`
 
     console.log(`[EIA] Fetching renewable capacity for state: ${state}`)
 

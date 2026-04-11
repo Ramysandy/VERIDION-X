@@ -9,6 +9,7 @@ import groqRoutes from './routes/groq.js'
 import firecrawlRoutes from './routes/firecrawl.js'
 import nostrRoutes from './routes/nostr.js'
 import auditRoutes from './routes/audit.js'
+import secRoutes from './routes/sec.js'
 
 // Load environment variables
 const app = express()
@@ -34,6 +35,7 @@ app.use('/api/groq', groqRoutes)
 app.use('/api/firecrawl', firecrawlRoutes)
 app.use('/api/nostr', nostrRoutes)
 app.use('/api/audit', auditRoutes)
+app.use('/api/sec', secRoutes)
 
 // Error handling middleware
 app.use((err, req, res, next) => {
