@@ -50,8 +50,8 @@ export default function Navigation() {
           <HStack spacing={3} cursor="pointer" onClick={() => navigate('/')}
             _hover={{ opacity: 0.85 }} transition="opacity 0.2s">
             <Text
-              fontFamily="heading" fontWeight={900} fontSize="xl"
-              className="gradient-text" letterSpacing="-0.02em"
+              className="gradient-text logo-font" fontWeight={900} fontSize="xl"
+              letterSpacing="0.05em"
             >
               ⚡ VERIDION-X
             </Text>

@@ -143,7 +143,7 @@ export default function ResultsPage() {
                     { label: 'Company', value: claim?.company, color: '#FF6B2B' },
                     { label: 'Contradictions', value: verdict?.contradictions ?? 0, color: (verdict?.contradictions ?? 0) > 0 ? '#EF4444' : '#22C55E' },
                     { label: 'Claimed vs Actual', value: `${verdict?.claimedRenewable ?? '--'}% vs ${verdict?.actualRenewable ?? '--'}%`, color: '#FF6B2B' },
-                    { label: 'Confidence', value: `${verdict?.confidence ?? 0}%`, color: '#22D3EE' },
+                    { label: 'Confidence', value: `${verdict?.confidence ?? 0}%`, color: '#5B7FFF' },
                   ].map(({ label, value, color }) => (
                     <Card key={label} className="glass" border="1px solid rgba(255,107,43,0.1)">
                       <CardBody py={4}>
@@ -255,7 +255,7 @@ export default function ResultsPage() {
 
               {/* SEC Card */}
               {secData && (
-                <MotionCard variants={fadeUp} className="glass" borderLeft="4px solid #22D3EE">
+                <MotionCard variants={fadeUp} className="glass" borderLeft="4px solid #5B7FFF">
                   <CardBody>
                     <VStack align="start" spacing={3}>
                       <HStack justify="space-between" w="full">
@@ -270,7 +270,7 @@ export default function ResultsPage() {
                       <Text color="rgba(255,255,255,0.65)" fontSize="sm">{secData.esgStatement}</Text>
                       {secData.edgarUrl && (
                         <Text as="a" href={secData.edgarUrl} target="_blank" rel="noopener noreferrer"
-                          fontSize="xs" color="#22D3EE" _hover={{ textDecoration: 'underline' }}>
+                          fontSize="xs" color="#5B7FFF" _hover={{ textDecoration: 'underline' }}>
                           View on SEC EDGAR <ExternalLinkIcon mx={1} boxSize={3} />
                         </Text>
                       )}
@@ -317,8 +317,8 @@ export default function ResultsPage() {
                     New Audit
                   </Button>
                   <Button variant="outline" size="sm"
-                    borderColor="rgba(34,211,238,0.4)" color="#22D3EE"
-                    _hover={{ bg: 'rgba(34,211,238,0.08)' }}
+                    borderColor="rgba(91,127,255,0.4)" color="#5B7FFF"
+                    _hover={{ bg: 'rgba(91,127,255,0.08)' }}
                     rightIcon={<ExternalLinkIcon />} onClick={handleShare}>
                     View on Nostr
                   </Button>

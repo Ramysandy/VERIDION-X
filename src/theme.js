@@ -3,7 +3,8 @@ import { extendTheme } from '@chakra-ui/react'
 const theme = extendTheme({
   fonts: {
     heading: `'Bricolage Grotesque', sans-serif`,
-    body: `'Outfit', sans-serif`,
+    body: `'Bricolage Grotesque', sans-serif`,
+    logo: `'Orbitron', monospace`,
   },
   colors: {
     brand: {

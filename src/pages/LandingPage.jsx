@@ -115,11 +115,10 @@ export default function LandingPage() {
             <MotionBox variants={fadeUp}>
               <VStack spacing={2}>
                 <Text
-                  fontSize={{ base: '4rem', md: '7rem' }}
+                  fontSize={{ base: '3.5rem', md: '6.5rem' }}
                   fontWeight={900} lineHeight={1}
-                  className="gradient-text"
-                  fontFamily="heading"
-                  letterSpacing="-0.03em">
+                  className="gradient-text logo-font"
+                  letterSpacing="0.04em">
                   VERIDION-X
                 </Text>
                 <Text fontSize={{ base: 'xl', md: '2xl' }} color="rgba(255,255,255,0.65)" fontWeight={400} minH="2rem">
@@ -246,7 +245,7 @@ export default function LandingPage() {
           <motion.div variants={stagger} initial="hidden" whileInView="show" viewport={{ once: true }}>
             <VStack spacing={12}>
               <MotionBox variants={fadeUp} textAlign="center">
-                <Text fontSize="xs" color="#22D3EE" fontWeight={700} letterSpacing="widest" mb={2}>CAPABILITIES</Text>
+                <Text fontSize="xs" color="#5B7FFF" fontWeight={700} letterSpacing="widest" mb={2}>CAPABILITIES</Text>
                 <Text fontSize={{ base: '2xl', md: '4xl' }} fontWeight={900} color="white">Built for Truth</Text>
               </MotionBox>
               <SimpleGrid columns={{ base: 1, md: 2, lg: 4 }} spacing={5} w="full">

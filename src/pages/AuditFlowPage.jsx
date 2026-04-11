@@ -34,7 +34,7 @@ import { useEffect, useState, useRef } from 'react'
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { useAuditStore } from '../store/auditStore'
-import { eiaAPI, epaAPI, groqAPI, nostrAPI, secAPI } from '../api/client'
+import { eiaAPI, epaAPI, groqAPI, nostrAPI, secAPI, firecrawlAPI } from '../api/client'
 
 const MotionBox = motion(Box)
 
@@ -58,12 +58,14 @@ export default function AuditFlowPage() {
   const navigate = useNavigate()
   const hasStarted = useRef(false)
 
+  const targetCompany = useAuditStore((s) => s.targetCompany)
   const claim = useAuditStore((s) => s.claim)
   const auditPhase = useAuditStore((s) => s.auditPhase)
   const eiaData = useAuditStore((s) => s.eiaData)
   const epaData = useAuditStore((s) => s.epaData)
   const secData = useAuditStore((s) => s.secData)
   const error = useAuditStore((s) => s.error)
+  const setClaimData = useAuditStore((s) => s.setClaimData)
   const setEiaData = useAuditStore((s) => s.setEiaData)
   const setEpaData = useAuditStore((s) => s.setEpaData)
   const setSecData = useAuditStore((s) => s.setSecData)
@@ -87,12 +89,29 @@ export default function AuditFlowPage() {
   }, [auditPhase])
 
   useEffect(() => {
-    if (!claim || hasStarted.current) return
+    if (!targetCompany || hasStarted.current) return
     const runAudit = async () => {
       hasStarted.current = true
-      const state = claim.state || 'CA'
-      const company = claim.company
+      const company = targetCompany
+      const state = 'CA'
       try {
+        // Step 0: Scrape ESG claim from company website via FireCrawl + Groq
+        setAuditPhase('EXTRACTING_CLAIM')
+        let claimText = `${company}'s commitment to 100% renewable energy and carbon neutrality`
+        let claimedRenewable = 100
+        try {
+          const scraped = await firecrawlAPI.scrapeClaims(company)
+          if (scraped?.markdown || scraped?.content) {
+            const parsed = await groqAPI.extractClaim(scraped.markdown || scraped.content, company)
+            if (parsed?.claim) {
+              claimText = parsed.claim
+              claimedRenewable = parsed.claimedRenewable || 100
+            }
+          }
+        } catch { /* non-fatal: use fallback claim */ }
+        const claimObj = { company, claim: claimText, claimedRenewable, state }
+        setClaimData(claimObj)
+
         // Step 1: EIA
         const eia = await eiaAPI.getRenewableCapacity(state, company)
         addPayment(100, 'EIA')
@@ -113,7 +132,7 @@ export default function AuditFlowPage() {
 
         // Step 4: AI verdict via Groq
         setAuditPhase('SCORING')
-        const groq = await groqAPI.analyzeClaim(company, claim.claim,
+        const groq = await groqAPI.analyzeClaim(company, claimText,
           { renewablePercentage: eia.renewablePercentage, totalCapacity: eia.totalCapacity },
           { co2Intensity: epa.co2Intensity },
           sec
@@ -127,7 +146,7 @@ export default function AuditFlowPage() {
           confidence: ai.confidence ?? 88,
           riskScore: ai.riskScore ?? 50,
           riskLevel: ai.riskLevel ?? 'MEDIUM',
-          claimedRenewable: claim.claimedRenewable || 100,
+          claimedRenewable: claimedRenewable,
           actualRenewable: eia.renewablePercentage,
           co2Intensity: epa.co2Intensity,
           reasons: ai.reasons || [],
@@ -141,7 +160,7 @@ export default function AuditFlowPage() {
         setNostrNoteId(nostrResult.noteId)
 
         // Save to leaderboard in localStorage
-        const entry = { company, verdict, narrative: groq.narrative, nostrNoteId: nostrResult.noteId, timestamp: new Date().toISOString(), claim: claim.claim }
+        const entry = { company, verdict, narrative: groq.narrative, nostrNoteId: nostrResult.noteId, timestamp: new Date().toISOString(), claim: claimText }
         const existing = JSON.parse(localStorage.getItem('veridion_leaderboard') || '[]')
         const updated = [entry, ...existing.filter(e => e.company !== company)].slice(0, 20)
         localStorage.setItem('veridion_leaderboard', JSON.stringify(updated))
@@ -152,7 +171,7 @@ export default function AuditFlowPage() {
       }
     }
     runAudit()
-  }, [claim])
+  }, [targetCompany])
 
   return (
     <Box className="aurora-bg grid-bg" minH="100vh" py={8} position="relative" overflow="hidden">
@@ -238,7 +257,7 @@ export default function AuditFlowPage() {
                       <Text color="rgba(255,255,255,0.7)" lineHeight="tall">"{claim?.claim}"</Text>
                       <HStack spacing={3} flexWrap="wrap">
                         <Badge bg="rgba(255,107,43,0.15)" color="#FF9B51" borderRadius="full" px={3}>Claimed Renewable: {claim?.claimedRenewable}%</Badge>
-                        <Badge bg="rgba(34,211,238,0.1)" color="#22D3EE" borderRadius="full" px={3}>{claim?.location}</Badge>
+                        <Badge bg="rgba(91,127,255,0.1)" color="#5B7FFF" borderRadius="full" px={3}>{claim?.location}</Badge>
                         <Badge bg="rgba(255,255,255,0.08)" color="rgba(255,255,255,0.6)" borderRadius="full" px={3}>{claim?.year}</Badge>
                       </HStack>
                     </VStack>
@@ -338,7 +357,7 @@ export default function AuditFlowPage() {
                         )}
                         <Text fontSize="xs" color="rgba(255,255,255,0.3)">Source: {secData.dataSource}</Text>
                         <Text as="a" href={secData.edgarUrl} target="_blank" rel="noopener noreferrer"
-                          fontSize="xs" color="#22D3EE" textDecoration="underline">
+                          fontSize="xs" color="#5B7FFF" textDecoration="underline">
                           View on SEC EDGAR →
                         </Text>
                       </VStack>

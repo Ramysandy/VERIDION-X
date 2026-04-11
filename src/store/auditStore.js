@@ -23,6 +23,25 @@ const useAuditStore = create((set, get) => ({
     error: null,
   }),
 
+  // Set company name from landing page — resets all state, triggers audit flow
+  setAuditCompany: (company) => set({
+    targetCompany: company,
+    claim: null,
+    eiaData: null,
+    epaData: null,
+    secData: null,
+    aiVerdict: null,
+    verdict: null,
+    narrative: '',
+    auditPhase: 'EXTRACTING_CLAIM',
+    nostrNoteId: '',
+    payments: [],
+    error: null,
+  }),
+
+  // Update claim data mid-pipeline without resetting phase
+  setClaimData: (claim) => set({ claim }),
+
   // Each setter advances the phase
   setEiaData: (eiaData) => set({ eiaData, auditPhase: 'FETCHING_EIA' }),
   setEpaData: (epaData) => set({ epaData, auditPhase: 'LOADING_EPA' }),

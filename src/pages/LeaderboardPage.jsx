@@ -239,7 +239,7 @@ export default function LeaderboardPage() {
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   fontSize="xs"
-                                  color="#22D3EE"
+                                  color="#5B7FFF"
                                   _hover={{ textDecoration: 'underline' }}
                                 >
                                   {entry.nostrNoteId.slice(0, 10)}\u2026

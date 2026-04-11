@@ -2,6 +2,17 @@
    VERIDION-X — Aceternity / Animate UI Inspired Premium Design System
    ===================================================================== */
 
+/* ── Global font override — Bricolage Grotesque everywhere ──────────── */
+*, *::before, *::after {
+  font-family: 'Bricolage Grotesque', sans-serif !important;
+}
+
+/* ── Orbitron override — only for .logo-font ────────────────────────── */
+.logo-font {
+  font-family: 'Orbitron', monospace !important;
+  letter-spacing: 0.06em;
+}
+
 /* ── Animated gradient text ─────────────────────────────────────────── */
 .gradient-text {
   background: linear-gradient(135deg, #FF6B2B 0%, #FF9B51 35%, #FBBF24 65%, #FF6B2B 100%);
@@ -13,7 +24,7 @@
 }
 
 .gradient-text-cyan {
-  background: linear-gradient(135deg, #22D3EE 0%, #A855F7 45%, #FF6B2B 100%);
+  background: linear-gradient(135deg, #1C39BB 0%, #5B7FFF 45%, #FF6B2B 100%);
   background-size: 300% 300%;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -32,7 +43,7 @@
   background:
     radial-gradient(ellipse 90% 55% at 50% -10%, rgba(255,107,43,0.18), transparent),
     radial-gradient(ellipse 55% 45% at 90% 95%,  rgba(168,85,247,0.12),  transparent),
-    radial-gradient(ellipse 55% 45% at 5%  60%,  rgba(34,211,238,0.07),  transparent),
+    radial-gradient(ellipse 55% 45% at 5%  60%,  rgba(28,57,187,0.10),   transparent),
     #07101F;
 }
 
@@ -109,7 +120,7 @@
 }
 .orb-orange { background: radial-gradient(circle, #FF6B2B, transparent 70%); }
 .orb-purple { background: radial-gradient(circle, #A855F7, transparent 70%); animation-delay: -5s; }
-.orb-cyan   { background: radial-gradient(circle, #22D3EE, transparent 70%); animation-delay: -2s; }
+.orb-cyan   { background: radial-gradient(circle, #1C39BB, transparent 70%); animation-delay: -2s; }
 
 @keyframes floatOrb {
   0%, 100% { transform: translateY(0px)   scale(1);    }
@@ -182,7 +193,7 @@
   position: absolute;
   inset: -1px;
   border-radius: 17px;
-  background: linear-gradient(135deg, rgba(255,107,43,0.6), rgba(168,85,247,0.3), rgba(34,211,238,0.2));
+  background: linear-gradient(135deg, rgba(255,107,43,0.6), rgba(168,85,247,0.3), rgba(91,127,255,0.3));
   z-index: -1;
 }
 
