@@ -28,7 +28,7 @@ async function publishToNostr(eventTemplate) {
         const timeout = setTimeout(() => {
           ws.terminate()
           reject(new Error(`Relay ${relayUrl} timed out`))
-        }, 8000)
+        }, 3000)
 
         ws.on('open', () => {
           ws.send(JSON.stringify(['EVENT', signedEvent]))

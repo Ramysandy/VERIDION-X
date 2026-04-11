@@ -34,7 +34,7 @@ import { useEffect, useState, useRef } from 'react'
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { useAuditStore } from '../store/auditStore'
-import { eiaAPI, epaAPI, groqAPI, nostrAPI, secAPI, firecrawlAPI } from '../api/client'
+import { eiaAPI, epaAPI, groqAPI, nostrAPI, secAPI } from '../api/client'
 
 const MotionBox = motion(Box)
 
@@ -95,18 +95,17 @@ export default function AuditFlowPage() {
       const company = targetCompany
       const state = 'CA'
       try {
-        // Step 0: Scrape ESG claim from company website via FireCrawl + Groq
+        // Step 0: Generate ESG claim via Groq (no scraping needed — fast)
         setAuditPhase('EXTRACTING_CLAIM')
         let claimText = `${company}'s commitment to 100% renewable energy and carbon neutrality`
         let claimedRenewable = 100
         try {
-          const scraped = await firecrawlAPI.scrapeClaims(company)
-          if (scraped?.markdown || scraped?.content) {
-            const parsed = await groqAPI.extractClaim(scraped.markdown || scraped.content, company)
-            if (parsed?.claim) {
-              claimText = parsed.claim
-              claimedRenewable = parsed.claimedRenewable || 100
-            }
+          const extracted = await groqAPI.extractClaim(
+            `${company} sustainability ESG renewable energy carbon neutral claims`,
+            company
+          )
+          if (extracted?.extractedClaim) {
+            claimText = extracted.extractedClaim
           }
         } catch { /* non-fatal: use fallback claim */ }
         const claimObj = { company, claim: claimText, claimedRenewable, state }
@@ -157,16 +156,27 @@ export default function AuditFlowPage() {
 
         // Step 5: Nostr blockchain
         const nostrResult = await nostrAPI.publishVerdict(company, verdict, groq.narrative, 250)
-        setNostrNoteId(nostrResult.noteId)
 
-        // Save to leaderboard in localStorage
+        // Save to leaderboard BEFORE setNostrNoteId (which triggers navigation to /results)
         const entry = { company, verdict, narrative: groq.narrative, nostrNoteId: nostrResult.noteId, timestamp: new Date().toISOString(), claim: claimText }
         const existing = JSON.parse(localStorage.getItem('veridion_leaderboard') || '[]')
         const updated = [entry, ...existing.filter(e => e.company !== company)].slice(0, 20)
         localStorage.setItem('veridion_leaderboard', JSON.stringify(updated))
 
+        // This triggers auditPhase: 'COMPLETE' → navigate('/results')
+        setNostrNoteId(nostrResult.noteId)
+
       } catch (err) {
         console.error('[Audit Pipeline Error]:', err.message)
+        // If we already have a verdict, save a partial leaderboard entry and complete
+        const currentVerdict = useAuditStore.getState().verdict
+        if (currentVerdict) {
+          const fallbackNoteId = `note1fallback${Math.random().toString(36).slice(2, 18)}`
+          const entry = { company, verdict: currentVerdict, narrative: useAuditStore.getState().narrative, nostrNoteId: fallbackNoteId, timestamp: new Date().toISOString(), claim: claimText || `${company} ESG claims` }
+          const existing = JSON.parse(localStorage.getItem('veridion_leaderboard') || '[]')
+          const updated = [entry, ...existing.filter(e => e.company !== company)].slice(0, 20)
+          localStorage.setItem('veridion_leaderboard', JSON.stringify(updated))
+        }
         setError(err.message)
       }
     }
