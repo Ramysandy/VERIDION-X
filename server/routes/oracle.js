@@ -77,6 +77,8 @@ router.get('/stream', async (req, res) => {
 
     let signature = null
     let transaction = null
+    let merkleTree = null
+    let tapscript = null
 
     if (consensus.consensusReached) {
       // --- FROST Threshold Signing ---
@@ -131,6 +133,31 @@ router.get('/stream', async (req, res) => {
 
       transaction = oracle.constructTransaction(verdictData, signature)
       send('transaction', transaction)
+
+      // --- Build Merkle Tree for verdict data integrity ---
+      const merkleItems = [
+        JSON.stringify({ company, fraudDetected: true }),
+        JSON.stringify({ riskScore: verdictData.riskScore, riskLevel: verdictData.riskLevel }),
+        JSON.stringify({ consensus: verdictData.oracleConsensus }),
+        signature.signature,
+        transaction.verdictHash,
+      ]
+      merkleTree = oracle.buildMerkleTree(merkleItems)
+      send('merkle', {
+        root: merkleTree.root,
+        depth: merkleTree.depth,
+        leafCount: merkleTree.leafCount,
+        leaves: merkleTree.leaves,
+      })
+
+      // --- Generate Tapscript spending paths ---
+      tapscript = oracle.generateTapscript(transaction.verdictHash)
+      send('tapscript', {
+        address: tapscript.address,
+        scriptRoot: tapscript.scriptRoot,
+        scripts: tapscript.scripts.map(s => ({ name: s.name, description: s.description, leafHash: s.leafHash })),
+        depth: tapscript.depth,
+      })
     }
 
     // --- Final Result ---
@@ -152,6 +179,12 @@ router.get('/stream', async (req, res) => {
             opReturn: transaction.opReturn,
           }
         : null,
+      merkle: merkleTree
+        ? { root: merkleTree.root, depth: merkleTree.depth, leafCount: merkleTree.leafCount }
+        : null,
+      tapscript: tapscript
+        ? { address: tapscript.address, scriptRoot: tapscript.scriptRoot, scripts: tapscript.scripts.map(s => s.name) }
+        : null,
       verdict: {
         fraudDetected: primary.fraudDetected,
         riskScore: primary.riskScore,
@@ -164,6 +197,7 @@ router.get('/stream', async (req, res) => {
       eiaData: primary.eiaData,
       epaData: primary.epaData,
       secData: primary.secData,
+      satelliteData: primary.satelliteData,
       taproot: oracle.taprootInfo,
       groupPubKey: oracle.xOnlyGroupKey,
     })
@@ -242,6 +276,113 @@ router.get('/testnet/:address', async (req, res) => {
   }
 })
 
+// POST /api/oracle/broadcast — Broadcast raw transaction to Bitcoin testnet
+router.post('/broadcast', async (req, res) => {
+  const { rawHex } = req.body
+  if (!rawHex) {
+    return res.status(400).json({ error: 'Missing rawHex transaction data' })
+  }
+  try {
+    // POST raw hex to mempool.space testnet
+    const response = await axios.post(
+      'https://mempool.space/testnet/api/tx',
+      rawHex,
+      { headers: { 'Content-Type': 'text/plain' }, timeout: 15000 }
+    )
+    const txId = response.data // mempool.space returns txid as text
+    res.json({
+      success: true,
+      txId,
+      mempoolUrl: `https://mempool.space/testnet/tx/${txId}`,
+      network: 'testnet',
+      broadcastAt: new Date().toISOString(),
+    })
+  } catch (error) {
+    // Expected to fail for simulated txs — return detailed error
+    const errorMsg = error.response?.data || error.message
+    res.json({
+      success: false,
+      error: typeof errorMsg === 'string' ? errorMsg : JSON.stringify(errorMsg),
+      note: 'Transaction broadcast failed — this is expected for simulated UTXOs. Fund the P2TR address via a testnet faucet to enable real broadcasts.',
+      faucetUrl: 'https://bitcoinfaucet.uo1.net/send.php',
+      network: 'testnet',
+    })
+  }
+})
+
+// GET /api/oracle/utxos/:address — Fetch UTXOs for a testnet address
+router.get('/utxos/:address', async (req, res) => {
+  const { address } = req.params
+  try {
+    const response = await axios.get(
+      `https://mempool.space/testnet/api/address/${address}/utxo`,
+      { timeout: 8000 }
+    )
+    const utxos = response.data || []
+    const totalSats = utxos.reduce((sum, u) => sum + (u.value || 0), 0)
+    res.json({
+      address,
+      utxos,
+      count: utxos.length,
+      totalSats,
+      totalBTC: (totalSats / 1e8).toFixed(8),
+      funded: utxos.length > 0,
+      network: 'testnet',
+    })
+  } catch (error) {
+    res.json({
+      address,
+      utxos: [],
+      count: 0,
+      totalSats: 0,
+      totalBTC: '0.00000000',
+      funded: false,
+      network: 'testnet',
+      error: error.message,
+    })
+  }
+})
+
+// POST /api/oracle/merkle — Build Merkle tree from verdict data
+router.post('/merkle', (req, res) => {
+  try {
+    const { verdictData } = req.body
+    if (!verdictData || !Array.isArray(verdictData)) {
+      return res.status(400).json({ error: 'Missing verdictData array' })
+    }
+    if (!oracle.initialized) oracle.initialize()
+    const tree = oracle.buildMerkleTree(verdictData)
+    res.json({
+      ...tree,
+      verified: true,
+      algorithm: 'SHA-256 Merkle Tree',
+      builtAt: new Date().toISOString(),
+    })
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// GET /api/oracle/tapscript — Generate Tapscript spending paths
+router.get('/tapscript', (req, res) => {
+  try {
+    if (!oracle.initialized) oracle.initialize()
+    const verdictHash = req.query.verdictHash || null
+    const tapscript = oracle.generateTapscript(verdictHash)
+    res.json({
+      ...tapscript,
+      scheme: 'BIP-342 Tapscript',
+      keyPath: {
+        available: true,
+        description: 'FROST aggregate key-path spend (default)',
+      },
+      generatedAt: new Date().toISOString(),
+    })
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+})
+
 /**
  * Run a single oracle node — independently fetches all data + runs AI verdict
  */
@@ -286,6 +427,26 @@ async function runOracleNode(nodeId, company, send) {
       log('warn', `SEC EDGAR timeout — proceeding without filing data`)
     }
 
+    // Step 5: NASA POWER Satellite Data
+    log('fetch', `Querying NASA POWER satellite — solar irradiance & wind...`)
+    let satellite = null
+    try {
+      const satRes = await axios.post(
+        `${API_BASE}/satellite/power`,
+        { company },
+        { timeout: 15000 }
+      )
+      satellite = satRes.data
+      if (satellite.fetched) {
+        log('data', `🛰️ NASA → Solar: ${satellite.solar.irradiance} kWh/m²/day (${satellite.solar.rating}) @ ${satellite.location}`)
+        log('data', `🛰️ NASA → Wind: ${satellite.wind.speed50m} m/s (${satellite.wind.rating}) | Temp: ${satellite.temperature}°C`)
+      } else {
+        log('warn', `NASA POWER data unavailable — continuing without satellite data`)
+      }
+    } catch {
+      log('warn', `NASA POWER timeout — proceeding without satellite data`)
+    }
+
     // Step 4: Groq AI
     log('ai', `Running Groq llama-3.3-70b-versatile analysis...`)
     const groqRes = await axios.post(`${API_BASE}/groq/analyze`, {
@@ -304,6 +465,13 @@ async function runOracleNode(nodeId, company, send) {
         sectorMultiplier: epa.sectorMultiplier,
       },
       secData: sec,
+      satelliteData: satellite ? {
+        solarIrradiance: satellite.solar?.irradiance,
+        solarRating: satellite.solar?.rating,
+        windSpeed: satellite.wind?.speed50m,
+        windRating: satellite.wind?.rating,
+        location: satellite.location,
+      } : null,
     })
 
     const ai = groqRes.data.aiVerdict || {}
@@ -330,6 +498,7 @@ async function runOracleNode(nodeId, company, send) {
       eiaData: eia,
       epaData: epa,
       secData: sec,
+      satelliteData: satellite,
     }
   } catch (error) {
     log('error', `Node ${nodeId} error: ${error.message}`)

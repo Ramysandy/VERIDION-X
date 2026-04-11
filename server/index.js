@@ -11,6 +11,7 @@ import nostrRoutes from './routes/nostr.js'
 import auditRoutes from './routes/audit.js'
 import secRoutes from './routes/sec.js'
 import oracleRoutes from './routes/oracle.js'
+import satelliteRoutes from './routes/satellite.js'
 
 // Load environment variables
 const app = express()
@@ -38,6 +39,7 @@ app.use('/api/nostr', nostrRoutes)
 app.use('/api/audit', auditRoutes)
 app.use('/api/sec', secRoutes)
 app.use('/api/oracle', oracleRoutes)
+app.use('/api/satellite', satelliteRoutes)
 
 // Error handling middleware
 app.use((err, req, res, next) => {
@@ -79,6 +81,8 @@ app.listen(PORT, () => {
   console.log('  POST /api/nostr/publish          - Publish proof')
   console.log('  GET  /api/oracle/stream          - FROST oracle SSE')
   console.log('  GET  /api/oracle/info            - Oracle status')
+  console.log('  POST /api/oracle/broadcast       - Broadcast to testnet')
+  console.log('  POST /api/satellite/power        - NASA POWER satellite data')
 })
 
 export default app

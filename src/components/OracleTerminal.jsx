@@ -5,16 +5,16 @@ import { motion } from 'framer-motion'
 const MotionBox = motion(Box)
 
 const LOG_COLORS = {
-  system: 'rgba(255,255,255,0.5)',
-  crypto: '#A78BFA',    // purple
-  fetch: '#60A5FA',     // blue
-  data: '#34D399',      // green
-  ai: '#FBBF24',        // amber
-  alert: '#EF4444',     // red
-  success: '#22C55E',   // bright green
-  warn: '#F59E0B',      // orange
-  error: '#EF4444',     // red
-  detail: 'rgba(255,255,255,0.4)',
+  system: 'rgba(255,255,255,0.7)',
+  crypto: '#C4B5FD',    // lighter purple
+  fetch: '#93C5FD',     // lighter blue
+  data: '#6EE7B7',      // lighter green
+  ai: '#FCD34D',        // lighter amber
+  alert: '#FCA5A5',     // lighter red
+  success: '#4ADE80',   // bright green
+  warn: '#FBBF24',      // orange
+  error: '#FCA5A5',     // lighter red
+  detail: 'rgba(255,255,255,0.6)',
 }
 
 const LOG_PREFIX = {
@@ -151,10 +151,10 @@ export default function OracleTerminal({ nodeId, logs = [], status = 'waiting' }
         <VStack align="start" spacing={0}>
           {logs.length === 0 && (
             <VStack align="start" spacing={1} w="full" py={4}>
-              <Text color="rgba(255,255,255,0.12)" fontSize="2xs" fontFamily="'JetBrains Mono', monospace">
+              <Text color="rgba(255,255,255,0.25)" fontSize="2xs" fontFamily="'JetBrains Mono', monospace">
                 $ frost-oracle --node {nodeId} --threshold 2/3
               </Text>
-              <Text color="rgba(255,255,255,0.08)" fontSize="2xs" fontFamily="'JetBrains Mono', monospace">
+              <Text color="rgba(255,255,255,0.18)" fontSize="2xs" fontFamily="'JetBrains Mono', monospace">
                 Waiting for audit trigger...
               </Text>
             </VStack>
@@ -162,7 +162,7 @@ export default function OracleTerminal({ nodeId, logs = [], status = 'waiting' }
           {logs.map((log, i) => (
             <HStack key={i} spacing={0} align="start" w="full" py="1px">
               <Text
-                color="rgba(255,255,255,0.15)"
+                color="rgba(255,255,255,0.3)"
                 fontSize="10px"
                 fontFamily="'JetBrains Mono', monospace"
                 flexShrink={0}

@@ -49,8 +49,8 @@ const HOW_IT_WORKS = [
 
 const FEATURES = [
   { icon: '🔐', title: 'FROST Threshold', desc: '2-of-3 Schnorr threshold signatures via Shamir\'s Secret Sharing and Lagrange interpolation. No single point of failure.', tag: 'Cryptography' },
-  { icon: '₿', title: 'Bitcoin Taproot', desc: 'BIP-341 P2TR addresses with key-path spending. Verdicts inscribed on-chain via OP_RETURN inscription.', tag: 'Settlement' },
-  { icon: '🛰️', title: 'Federal Data', desc: 'EIA energy grid, EPA eGRID CO₂ rates, SEC EDGAR 10-K filings — real government data, not self-reports.', tag: 'Data Sources' },
+  { icon: '₿', title: 'Bitcoin Taproot', desc: 'BIP-341 P2TR addresses with Tapscript spending paths. Verdicts inscribed on-chain via OP_RETURN with Merkle proofs.', tag: 'Settlement' },
+  { icon: '🛰️', title: 'NASA Satellite + Federal', desc: 'EIA energy, EPA eGRID CO₂, SEC EDGAR, and NASA POWER satellite data — real government + space data, not self-reports.', tag: 'Data Sources' },
   { icon: '🔗', title: 'Nostr + Bitcoin', desc: 'Dual-layer immutability: Nostr censorship-resistant relay broadcast and Bitcoin blockchain inscription.', tag: 'Decentralized' },
 ]
 
@@ -127,7 +127,7 @@ export default function LandingPage() {
             </MotionBox>
 
             <MotionBox variants={fadeUp} maxW="600px">
-              <Text color="rgba(255,255,255,0.5)" fontSize="lg" lineHeight={1.8}>
+              <Text color="rgba(255,255,255,0.65)" fontSize="lg" lineHeight={1.8}>
                 A decentralized fraud court where <strong style={{ color: '#FF9B51' }}>3 independent AI oracle nodes</strong> cross-reference
                 ESG claims against federal data — and seal the verdict with <strong style={{ color: '#A78BFA' }}>FROST threshold Schnorr signatures</strong> on Bitcoin.
               </Text>
@@ -201,7 +201,7 @@ export default function LandingPage() {
                 <MotionBox key={label} variants={fadeUp} textAlign="center">
                   <Text fontSize={{ base: '2xl', md: '3xl' }} fontWeight={900} className="gradient-text">{value}</Text>
                   <Text color="white" fontWeight={700} fontSize="sm">{label}</Text>
-                  <Text color="rgba(255,255,255,0.4)" fontSize="xs">{sub}</Text>
+                  <Text color="rgba(255,255,255,0.45)" fontSize="xs">{sub}</Text>
                 </MotionBox>
               ))}
             </SimpleGrid>
@@ -228,7 +228,7 @@ export default function LandingPage() {
                         <Text fontSize="xs" color="rgba(255,107,43,0.7)" fontWeight={700} letterSpacing="widest">STEP {step}</Text>
                       </HStack>
                       <Text color="white" fontWeight={700} fontSize="lg">{title}</Text>
-                      <Text color="rgba(255,255,255,0.55)" fontSize="sm" lineHeight={1.7}>{desc}</Text>
+                      <Text color="rgba(255,255,255,0.7)" fontSize="sm" lineHeight={1.7}>{desc}</Text>
                     </VStack>
                   </Box>
                 </MotionBox>
@@ -258,7 +258,7 @@ export default function LandingPage() {
                           {tag}
                         </Badge>
                         <Text color="white" fontWeight={700}>{title}</Text>
-                        <Text color="rgba(255,255,255,0.5)" fontSize="xs" lineHeight={1.7}>{desc}</Text>
+                        <Text color="rgba(255,255,255,0.65)" fontSize="xs" lineHeight={1.7}>{desc}</Text>
                       </VStack>
                     </Box>
                   </MotionBox>
@@ -273,10 +273,10 @@ export default function LandingPage() {
       <Box py={10} borderTop="1px solid rgba(255,255,255,0.06)">
         <Container maxW="container.xl">
           <VStack spacing={4}>
-            <Text fontSize="xs" color="rgba(255,255,255,0.3)" letterSpacing="widest">POWERED BY</Text>
+            <Text fontSize="xs" color="rgba(255,255,255,0.4)" letterSpacing="widest">POWERED BY</Text>
             <HStack spacing={8} flexWrap="wrap" justify="center">
-              {['🔐 FROST Schnorr', '₿ Bitcoin Taproot', '🏛️ EIA + EPA + SEC', '🤖 Groq AI', '🔗 Nostr'].map(src => (
-                <Text key={src} color="rgba(255,255,255,0.45)" fontSize="sm" fontWeight={600}>{src}</Text>
+              {['🔐 FROST Schnorr', '₿ Bitcoin Taproot', '🛰️ NASA POWER', '🏛️ EIA + EPA + SEC', '🤖 Groq AI', '🔗 Nostr'].map(src => (
+                <Text key={src} color="rgba(255,255,255,0.6)" fontSize="sm" fontWeight={600}>{src}</Text>
               ))}
             </HStack>
           </VStack>
@@ -292,7 +292,7 @@ export default function LandingPage() {
               <Text fontSize={{ base: '2xl', md: '3xl' }} fontWeight={900} color="white" lineHeight={1.2}>
                 No single oracle.<br />No single point of failure.
               </Text>
-              <Text color="rgba(255,255,255,0.5)" maxW="420px">
+              <Text color="rgba(255,255,255,0.6)" maxW="420px">
                 One company name. Three independent AI oracles. One FROST-signed Bitcoin verdict.
               </Text>
               <Button

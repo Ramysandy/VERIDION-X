@@ -27,6 +27,9 @@ export default function AuditFlowPage() {
   const setBitcoinTx = useAuditStore((s) => s.setBitcoinTx)
   const setTaprootAddress = useAuditStore((s) => s.setTaprootAddress)
   const setGroupPubKey = useAuditStore((s) => s.setGroupPubKey)
+  const setSatelliteData = useAuditStore((s) => s.setSatelliteData)
+  const setMerkleTree = useAuditStore((s) => s.setMerkleTree)
+  const setTapscriptInfo = useAuditStore((s) => s.setTapscriptInfo)
   const setError = useAuditStore((s) => s.setError)
 
   const [nodeLogs, setNodeLogs] = useState({ 1: [], 2: [], 3: [] })
@@ -116,6 +119,16 @@ export default function AuditFlowPage() {
       setBitcoinTx(data)
     })
 
+    source.addEventListener('merkle', (e) => {
+      const data = JSON.parse(e.data)
+      setMerkleTree(data)
+    })
+
+    source.addEventListener('tapscript', (e) => {
+      const data = JSON.parse(e.data)
+      setTapscriptInfo(data)
+    })
+
     source.addEventListener('complete', (e) => {
       const data = JSON.parse(e.data)
       source.close()
@@ -140,6 +153,7 @@ export default function AuditFlowPage() {
       if (data.eiaData) setEiaData({ renewable: data.eiaData.renewablePercentage, capacity: Math.round((data.eiaData.totalCapacity || 250000) / 1000), state: data.eiaData.state, source: data.eiaData.dataSource })
       if (data.epaData) setEpaData({ co2: data.epaData.co2Intensity, year: 2024, unit: data.epaData.unit, source: data.epaData.dataSource })
       if (data.secData) setSecData(data.secData)
+      if (data.satelliteData) setSatelliteData(data.satelliteData)
 
       setOracleResults({
         nodes: data.consensus?.nodeVotes || [],
@@ -226,7 +240,7 @@ export default function AuditFlowPage() {
                 <HStack justify="space-between" align="center" flexWrap="wrap" gap={3}>
                   <VStack align="start" spacing={1}>
                     <HStack spacing={3}>
-                      <Text fontSize="xs" color="rgba(255,255,255,0.4)" textTransform="uppercase" letterSpacing="0.1em">FROST Oracle Audit</Text>
+                      <Text fontSize="xs" color="rgba(255,255,255,0.55)" textTransform="uppercase" letterSpacing="0.1em">FROST Oracle Audit</Text>
                       <Badge bg="rgba(167,139,250,0.15)" color="#A78BFA" fontSize="2xs" borderRadius="full" px={2}>2-of-3 Threshold</Badge>
                     </HStack>
                     <Heading as="h2" size="lg" color="white" fontFamily="heading">{targetCompany}</Heading>
@@ -245,7 +259,7 @@ export default function AuditFlowPage() {
                       </Badge>
                     )}
                     {oracleInit?.taproot?.testnet && (
-                      <Text fontSize="2xs" color="rgba(255,255,255,0.3)" fontFamily="mono" mt={1}>
+                      <Text fontSize="2xs" color="rgba(255,255,255,0.45)" fontFamily="mono" mt={1}>
                         P2TR: {oracleInit.taproot.testnet.slice(0, 14)}...{oracleInit.taproot.testnet.slice(-6)}
                       </Text>
                     )}
@@ -254,22 +268,22 @@ export default function AuditFlowPage() {
 
                 {/* Progress timeline */}
                 <HStack spacing={0} w="full" pt={1}>
-                  {['Connect', 'Execute', 'Consensus', 'Sign', 'Done'].map((label, i) => (
+                  {['Connect', 'Execute', 'Satellite', 'Consensus', 'Sign', 'Done'].map((label, i) => (
                     <HStack key={label} flex={1} spacing={0}>
                       <VStack spacing={0.5}>
                         <Box
-                          w="20px" h="20px" borderRadius="full"
+                          w="18px" h="18px" borderRadius="full"
                           bg={i <= phaseIdx ? `${phaseColor[phase]}` : 'rgba(255,255,255,0.06)'}
                           border="2px solid"
                           borderColor={i <= phaseIdx ? `${phaseColor[phase]}` : 'rgba(255,255,255,0.1)'}
                           display="flex" alignItems="center" justifyContent="center"
                           boxShadow={i === phaseIdx ? `0 0 12px ${phaseColor[phase]}44` : 'none'}
                         >
-                          <Text fontSize="8px" color={i <= phaseIdx ? 'white' : 'rgba(255,255,255,0.3)'} fontWeight={800}>{i + 1}</Text>
+                          <Text fontSize="7px" color={i <= phaseIdx ? 'white' : 'rgba(255,255,255,0.3)'} fontWeight={800}>{i + 1}</Text>
                         </Box>
-                        <Text fontSize="8px" color={i <= phaseIdx ? phaseColor[phase] : 'rgba(255,255,255,0.25)'} fontWeight={i === phaseIdx ? 700 : 400} letterSpacing="0.05em">{label}</Text>
+                        <Text fontSize="7px" color={i <= phaseIdx ? phaseColor[phase] : 'rgba(255,255,255,0.25)'} fontWeight={i === phaseIdx ? 700 : 400} letterSpacing="0.05em">{label}</Text>
                       </VStack>
-                      {i < 4 && (
+                      {i < 5 && (
                         <Box flex={1} h="2px" mx={1} bg={i < phaseIdx ? phaseColor[phase] : 'rgba(255,255,255,0.06)'} borderRadius="full" />
                       )}
                     </HStack>
@@ -286,12 +300,12 @@ export default function AuditFlowPage() {
                 { label: 'Scheme', value: 'FROST', sub: 'Schnorr Threshold' },
                 { label: 'Threshold', value: '2-of-3', sub: 'Byzantine fault tolerant' },
                 { label: 'Group Key', value: oracleInit.groupPubKey?.slice(0,12) + '...', sub: 'BIP-340 x-only' },
-                { label: 'Network', value: 'Bitcoin', sub: 'Taproot P2TR' },
+                { label: 'Satellite', value: 'NASA', sub: 'POWER CERES/MERRA-2' },
               ].map(({ label, value, sub }) => (
                 <Box key={label} className="glass" p={3} borderRadius="lg" border="1px solid rgba(255,255,255,0.06)">
-                  <Text fontSize="2xs" color="rgba(255,255,255,0.4)" textTransform="uppercase" letterSpacing="0.08em">{label}</Text>
+                  <Text fontSize="2xs" color="rgba(255,255,255,0.5)" textTransform="uppercase" letterSpacing="0.08em">{label}</Text>
                   <Text fontSize="sm" color="white" fontWeight={700} fontFamily="mono">{value}</Text>
-                  <Text fontSize="2xs" color="rgba(255,255,255,0.3)">{sub}</Text>
+                  <Text fontSize="2xs" color="rgba(255,255,255,0.45)">{sub}</Text>
                 </Box>
               ))}
             </SimpleGrid>
@@ -300,7 +314,7 @@ export default function AuditFlowPage() {
           {/* 3 Oracle Terminal Panels */}
           <Box>
             <HStack mb={3} spacing={2}>
-              <Text fontSize="xs" color="rgba(255,255,255,0.4)" textTransform="uppercase" letterSpacing="0.1em" fontWeight={700}>
+              <Text fontSize="xs" color="rgba(255,255,255,0.55)" textTransform="uppercase" letterSpacing="0.1em" fontWeight={700}>
                 Oracle Nodes
               </Text>
               <Box flex={1} h="1px" bg="rgba(255,255,255,0.06)" />
@@ -320,7 +334,7 @@ export default function AuditFlowPage() {
                   <HStack justify="space-between" flexWrap="wrap" gap={3}>
                     <VStack align="start" spacing={1}>
                       <HStack spacing={2}>
-                        <Text fontSize="xs" color="rgba(255,255,255,0.4)" textTransform="uppercase" letterSpacing="0.1em">Consensus</Text>
+                        <Text fontSize="xs" color="rgba(255,255,255,0.55)" textTransform="uppercase" letterSpacing="0.1em">Consensus</Text>
                         <Badge bg={consensus.fraudDetected ? 'rgba(239,68,68,0.15)' : 'rgba(34,197,94,0.15)'} color={consensus.fraudDetected ? '#EF4444' : '#22C55E'} fontSize="2xs" borderRadius="full" px={2}>
                           {consensus.fraudDetected ? 'FRAUD DETECTED' : 'CLEAN'}
                         </Badge>
@@ -332,7 +346,7 @@ export default function AuditFlowPage() {
                     <HStack spacing={3}>
                       {consensus.nodeVotes?.map(v => (
                         <VStack key={v.id} spacing={0} px={3} py={2} bg="rgba(0,0,0,0.3)" borderRadius="lg" border="1px solid rgba(255,255,255,0.06)">
-                          <Text fontSize="2xs" color="rgba(255,255,255,0.4)">Node {v.id}</Text>
+                          <Text fontSize="2xs" color="rgba(255,255,255,0.5)">Node {v.id}</Text>
                           <Text fontSize="sm" fontWeight={800} color={v.fraud ? '#EF4444' : '#22C55E'}>{v.risk}</Text>
                           <Text fontSize="2xs" color={v.fraud ? '#EF4444' : '#22C55E'}>{v.fraud ? 'FRAUD' : 'CLEAN'}</Text>
                         </VStack>
@@ -356,19 +370,19 @@ export default function AuditFlowPage() {
                     </HStack>
                     <SimpleGrid columns={{ base: 1, md: 2 }} spacing={3} w="full">
                       <Box>
-                        <Text fontSize="2xs" color="rgba(255,255,255,0.4)" mb={1}>R (Nonce Point)</Text>
+                        <Text fontSize="2xs" color="rgba(255,255,255,0.55)" mb={1}>R (Nonce Point)</Text>
                         <Box p={2} bg="rgba(0,0,0,0.3)" borderRadius="md" border="1px solid rgba(167,139,250,0.15)">
-                          <Text fontSize="2xs" fontFamily="mono" color="rgba(255,255,255,0.7)" wordBreak="break-all">{signature.R}</Text>
+                          <Text fontSize="2xs" fontFamily="mono" color="rgba(255,255,255,0.8)" wordBreak="break-all">{signature.R}</Text>
                         </Box>
                       </Box>
                       <Box>
-                        <Text fontSize="2xs" color="rgba(255,255,255,0.4)" mb={1}>s (Aggregated Scalar)</Text>
+                        <Text fontSize="2xs" color="rgba(255,255,255,0.55)" mb={1}>s (Aggregated Scalar)</Text>
                         <Box p={2} bg="rgba(0,0,0,0.3)" borderRadius="md" border="1px solid rgba(167,139,250,0.15)">
-                          <Text fontSize="2xs" fontFamily="mono" color="rgba(255,255,255,0.7)" wordBreak="break-all">{signature.s}</Text>
+                          <Text fontSize="2xs" fontFamily="mono" color="rgba(255,255,255,0.8)" wordBreak="break-all">{signature.s}</Text>
                         </Box>
                       </Box>
                     </SimpleGrid>
-                    <Text fontSize="2xs" color="rgba(255,255,255,0.3)">
+                    <Text fontSize="2xs" color="rgba(255,255,255,0.45)">
                       Participating nodes: {signature.participatingNodes?.join(', ')} · Aggregate pubkey: {signature.aggregatePubKey?.slice(0,16)}...
                     </Text>
                   </VStack>
@@ -389,18 +403,18 @@ export default function AuditFlowPage() {
                     </HStack>
                     <SimpleGrid columns={{ base: 1, md: 2 }} spacing={3} w="full">
                       <Box>
-                        <Text fontSize="2xs" color="rgba(255,255,255,0.4)" mb={1}>TxID</Text>
+                        <Text fontSize="2xs" color="rgba(255,255,255,0.55)" mb={1}>TxID</Text>
                         <Text fontSize="2xs" fontFamily="mono" color="#FF9B51" wordBreak="break-all">{transaction.txId}</Text>
                       </Box>
                       <Box>
-                        <Text fontSize="2xs" color="rgba(255,255,255,0.4)" mb={1}>Verdict Inscription</Text>
-                        <Text fontSize="2xs" fontFamily="mono" color="rgba(255,255,255,0.7)">{transaction.opReturn}</Text>
+                        <Text fontSize="2xs" color="rgba(255,255,255,0.55)" mb={1}>Verdict Inscription</Text>
+                        <Text fontSize="2xs" fontFamily="mono" color="rgba(255,255,255,0.8)">{transaction.opReturn}</Text>
                       </Box>
                     </SimpleGrid>
                     <HStack spacing={3} flexWrap="wrap">
-                      <Text fontSize="2xs" color="rgba(255,255,255,0.3)">Size: {transaction.size} bytes</Text>
+                      <Text fontSize="2xs" color="rgba(255,255,255,0.45)">Size: {transaction.size} bytes</Text>
                       <Divider orientation="vertical" h={3} borderColor="rgba(255,255,255,0.1)" />
-                      <Text fontSize="2xs" color="rgba(255,255,255,0.3)">P2TR: {transaction.taprootAddress?.slice(0, 14)}...</Text>
+                      <Text fontSize="2xs" color="rgba(255,255,255,0.45)">P2TR: {transaction.taprootAddress?.slice(0, 14)}...</Text>
                       <Divider orientation="vertical" h={3} borderColor="rgba(255,255,255,0.1)" />
                       <Text as="a" href={transaction.mempoolUrl} target="_blank" rel="noopener noreferrer"
                         fontSize="2xs" color="#5B7FFF" _hover={{ textDecoration: 'underline' }}>

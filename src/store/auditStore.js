@@ -21,6 +21,9 @@ const useAuditStore = create((set, get) => ({
   bitcoinTx: null,        // { txId, rawHex, mempoolUrl, opReturn }
   taprootAddress: null,   // { testnet, mainnet, outputKey }
   groupPubKey: null,      // x-only FROST aggregate pubkey
+  satelliteData: null,    // NASA POWER solar/wind data
+  merkleTree: null,       // { root, depth, leafCount, leaves }
+  tapscriptInfo: null,    // { address, scriptRoot, scripts }
 
   // Claim kicks off the audit pipeline
   setClaim: (claim) => set({
@@ -49,6 +52,9 @@ const useAuditStore = create((set, get) => ({
     bitcoinTx: null,
     taprootAddress: null,
     groupPubKey: null,
+    satelliteData: null,
+    merkleTree: null,
+    tapscriptInfo: null,
   }),
 
   // Update claim data mid-pipeline without resetting phase
@@ -87,6 +93,9 @@ const useAuditStore = create((set, get) => ({
   setBitcoinTx: (bitcoinTx) => set({ bitcoinTx }),
   setTaprootAddress: (taprootAddress) => set({ taprootAddress }),
   setGroupPubKey: (groupPubKey) => set({ groupPubKey }),
+  setSatelliteData: (satelliteData) => set({ satelliteData }),
+  setMerkleTree: (merkleTree) => set({ merkleTree }),
+  setTapscriptInfo: (tapscriptInfo) => set({ tapscriptInfo }),
 
   resetAudit: () => set({
     claim: null,
@@ -101,6 +110,14 @@ const useAuditStore = create((set, get) => ({
     nostrNoteId: '',
     payments: [],
     error: null,
+    oracleResults: null,
+    frostSignature: null,
+    bitcoinTx: null,
+    taprootAddress: null,
+    groupPubKey: null,
+    satelliteData: null,
+    merkleTree: null,
+    tapscriptInfo: null,
   }),
 }))
 

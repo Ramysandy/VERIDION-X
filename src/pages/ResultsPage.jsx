@@ -87,7 +87,7 @@ function RiskGauge({ score, size = 160 }) {
       </svg>
       <VStack position="absolute" bottom="0" left="50%" transform="translateX(-50%)" spacing={0}>
         <Text fontSize="3xl" fontWeight={900} color={color} lineHeight={1}>{animatedScore}</Text>
-        <Text fontSize="2xs" color="rgba(255,255,255,0.4)" letterSpacing="0.1em" fontWeight={700}>{label}</Text>
+        <Text fontSize="2xs" color="rgba(255,255,255,0.6)" letterSpacing="0.1em" fontWeight={700}>{label}</Text>
       </VStack>
     </Box>
   )
@@ -108,6 +108,9 @@ export default function ResultsPage() {
   const bitcoinTx = useAuditStore((s) => s.bitcoinTx)
   const taprootAddress = useAuditStore((s) => s.taprootAddress)
   const groupPubKey = useAuditStore((s) => s.groupPubKey)
+  const satelliteData = useAuditStore((s) => s.satelliteData)
+  const merkleTree = useAuditStore((s) => s.merkleTree)
+  const tapscriptInfo = useAuditStore((s) => s.tapscriptInfo)
 
   const [sigVerified, setSigVerified] = useState(null) // null | 'loading' | { valid, ... }
   const [testnetInfo, setTestnetInfo] = useState(null)
@@ -192,7 +195,7 @@ export default function ResultsPage() {
                           {riskLevel} RISK
                         </Badge>
                       </HStack>
-                      <Text color="rgba(255,255,255,0.65)" fontSize="sm">
+                      <Text color="rgba(255,255,255,0.8)" fontSize="sm">
                         {claim?.company}'s ESG claims {verdict?.winner ? 'align with' : 'contradict'} federal data
                       </Text>
                       {/* Data sources strip */}
@@ -201,8 +204,10 @@ export default function ResultsPage() {
                           { label: 'EIA', icon: '⚡', ok: true },
                           { label: 'EPA', icon: '🌍', ok: true },
                           { label: 'SEC', icon: '📄', ok: !!secData },
+                          { label: 'NASA', icon: '🛰️', ok: !!satelliteData?.fetched },
                           { label: 'Groq AI', icon: '🤖', ok: true },
                           { label: 'FROST', icon: '🔐', ok: !!frostSignature },
+                          { label: 'Merkle', icon: '🌳', ok: !!merkleTree },
                         ].map(({ label, icon, ok }) => (
                           <Badge key={label}
                             bg={ok ? 'rgba(34,197,94,0.08)' : 'rgba(239,68,68,0.08)'}
@@ -232,7 +237,7 @@ export default function ResultsPage() {
                     <Card key={label} className="glass" border="1px solid rgba(255,107,43,0.1)">
                       <CardBody py={4}>
                         <Stat>
-                          <StatLabel color="rgba(255,255,255,0.5)" fontSize="xs">{label}</StatLabel>
+                          <StatLabel color="rgba(255,255,255,0.7)" fontSize="xs">{label}</StatLabel>
                           <StatNumber color={color} fontSize="md" noOfLines={1}>{value}</StatNumber>
                         </Stat>
                       </CardBody>
@@ -295,7 +300,7 @@ export default function ResultsPage() {
                           <Text fontSize="2xl" fontWeight={800} color="white">
                             {verdict?.confidence ?? 0}%
                           </Text>
-                          <Text fontSize="xs" color="rgba(255,255,255,0.45)">Confidence</Text>
+                          <Text fontSize="xs" color="rgba(255,255,255,0.6)">Confidence</Text>
                         </Box>
                       </Box>
                     </CardBody>
@@ -310,7 +315,7 @@ export default function ResultsPage() {
                     <Heading as="h3" size="md" color="white" fontFamily="heading">
                       Analysis
                     </Heading>
-                    <Text color="rgba(255,255,255,0.75)" lineHeight={1.8}>
+                    <Text color="rgba(255,255,255,0.88)" lineHeight={1.8}>
                       {narrative || 'Analysis pending...'}
                     </Text>
                   </VStack>
@@ -351,13 +356,62 @@ export default function ResultsPage() {
                           Disclosure Risk: {secData.disclosureRisk}
                         </Badge>
                       </HStack>
-                      <Text color="rgba(255,255,255,0.65)" fontSize="sm">{secData.esgStatement}</Text>
+                      <Text color="rgba(255,255,255,0.8)" fontSize="sm">{secData.esgStatement}</Text>
                       {secData.edgarUrl && (
                         <Text as="a" href={secData.edgarUrl} target="_blank" rel="noopener noreferrer"
                           fontSize="xs" color="#5B7FFF" _hover={{ textDecoration: 'underline' }}>
                           View on SEC EDGAR <ExternalLinkIcon mx={1} boxSize={3} />
                         </Text>
                       )}
+                    </VStack>
+                  </CardBody>
+                </MotionCard>
+              )}
+
+              {/* NASA Satellite Data */}
+              {satelliteData && (
+                <MotionCard variants={fadeUp} className="glass" borderLeft="4px solid #60A5FA">
+                  <CardBody>
+                    <VStack align="start" spacing={4}>
+                      <HStack justify="space-between" w="full" flexWrap="wrap">
+                        <Heading as="h3" size="sm" color="white" fontFamily="heading">
+                          🛰️ NASA POWER Satellite Data
+                        </Heading>
+                        <Badge bg="rgba(96,165,250,0.15)" color="#60A5FA" fontSize="xs" borderRadius="full" px={3}>
+                          {satelliteData.location || 'Unknown'}
+                        </Badge>
+                      </HStack>
+                      <SimpleGrid columns={{ base: 2, md: 4 }} spacing={3} w="full">
+                        <Box p={3} bg="rgba(0,0,0,0.3)" borderRadius="lg" border="1px solid rgba(96,165,250,0.15)" textAlign="center">
+                          <Text fontSize="2xs" color="rgba(255,255,255,0.55)">Solar Irradiance</Text>
+                          <Text fontSize="lg" fontWeight={800} color="#FBBF24">{satelliteData.solar?.irradiance ?? '--'}</Text>
+                          <Text fontSize="2xs" color="rgba(255,255,255,0.45)">kWh/m²/day</Text>
+                        </Box>
+                        <Box p={3} bg="rgba(0,0,0,0.3)" borderRadius="lg" border="1px solid rgba(96,165,250,0.15)" textAlign="center">
+                          <Text fontSize="2xs" color="rgba(255,255,255,0.55)">Solar Rating</Text>
+                          <Text fontSize="lg" fontWeight={800} color={
+                            satelliteData.solar?.rating === 'EXCELLENT' ? '#22C55E' :
+                            satelliteData.solar?.rating === 'GOOD' ? '#FBBF24' : '#EF4444'
+                          }>{satelliteData.solar?.rating ?? '--'}</Text>
+                          <Text fontSize="2xs" color="rgba(255,255,255,0.45)">Potential</Text>
+                        </Box>
+                        <Box p={3} bg="rgba(0,0,0,0.3)" borderRadius="lg" border="1px solid rgba(96,165,250,0.15)" textAlign="center">
+                          <Text fontSize="2xs" color="rgba(255,255,255,0.55)">Wind Speed</Text>
+                          <Text fontSize="lg" fontWeight={800} color="#60A5FA">{satelliteData.wind?.speed50m ?? '--'}</Text>
+                          <Text fontSize="2xs" color="rgba(255,255,255,0.45)">m/s @ 50m</Text>
+                        </Box>
+                        <Box p={3} bg="rgba(0,0,0,0.3)" borderRadius="lg" border="1px solid rgba(96,165,250,0.15)" textAlign="center">
+                          <Text fontSize="2xs" color="rgba(255,255,255,0.55)">Wind Rating</Text>
+                          <Text fontSize="lg" fontWeight={800} color={
+                            satelliteData.wind?.rating === 'EXCELLENT' ? '#22C55E' :
+                            satelliteData.wind?.rating === 'GOOD' ? '#FBBF24' : '#EF4444'
+                          }>{satelliteData.wind?.rating ?? '--'}</Text>
+                          <Text fontSize="2xs" color="rgba(255,255,255,0.45)">Potential</Text>
+                        </Box>
+                      </SimpleGrid>
+                      <Text fontSize="xs" color="rgba(255,255,255,0.5)">
+                        Source: {satelliteData.dataSource || 'NASA POWER'} · Satellite: {satelliteData.satellite || 'CERES/MERRA-2'}
+                      </Text>
                     </VStack>
                   </CardBody>
                 </MotionCard>
@@ -380,13 +434,13 @@ export default function ResultsPage() {
                       <SimpleGrid columns={3} spacing={3} w="full">
                         {oracleResults.nodes?.map(n => (
                           <Box key={n.id} p={3} bg="rgba(0,0,0,0.3)" borderRadius="lg" border="1px solid rgba(255,255,255,0.06)" textAlign="center">
-                            <Text fontSize="2xs" color="rgba(255,255,255,0.4)">Oracle Node {n.id}</Text>
+                            <Text fontSize="2xs" color="rgba(255,255,255,0.55)">Oracle Node {n.id}</Text>
                             <Text fontSize="xl" fontWeight={800} color={n.fraud ? '#EF4444' : '#22C55E'}>{n.risk}</Text>
                             <Badge bg={n.fraud ? 'rgba(239,68,68,0.15)' : 'rgba(34,197,94,0.15)'} color={n.fraud ? '#EF4444' : '#22C55E'} fontSize="2xs" borderRadius="full">{n.level}</Badge>
                           </Box>
                         ))}
                       </SimpleGrid>
-                      <Text fontSize="xs" color="rgba(255,255,255,0.4)">
+                      <Text fontSize="xs" color="rgba(255,255,255,0.55)">
                         Scheme: FROST 2-of-3 Schnorr Threshold · Shamir's Secret Sharing + Lagrange Interpolation
                       </Text>
                     </VStack>
@@ -420,12 +474,12 @@ export default function ResultsPage() {
                           <Text fontSize="xs" color="#A78BFA" fontWeight={700} mb={2}>FROST Schnorr Signature (BIP-340)</Text>
                           <SimpleGrid columns={{ base: 1, md: 2 }} spacing={2}>
                             <Box p={2} bg="rgba(0,0,0,0.3)" borderRadius="md" border="1px solid rgba(167,139,250,0.15)">
-                              <Text fontSize="2xs" color="rgba(255,255,255,0.4)">R (Nonce Point)</Text>
-                              <Text fontSize="2xs" fontFamily="mono" color="rgba(255,255,255,0.7)" wordBreak="break-all">{frostSignature.R}</Text>
+                              <Text fontSize="2xs" color="rgba(255,255,255,0.55)">R (Nonce Point)</Text>
+                              <Text fontSize="2xs" fontFamily="mono" color="rgba(255,255,255,0.8)" wordBreak="break-all">{frostSignature.R}</Text>
                             </Box>
                             <Box p={2} bg="rgba(0,0,0,0.3)" borderRadius="md" border="1px solid rgba(167,139,250,0.15)">
-                              <Text fontSize="2xs" color="rgba(255,255,255,0.4)">s (Aggregated Scalar)</Text>
-                              <Text fontSize="2xs" fontFamily="mono" color="rgba(255,255,255,0.7)" wordBreak="break-all">{frostSignature.s}</Text>
+                              <Text fontSize="2xs" color="rgba(255,255,255,0.55)">s (Aggregated Scalar)</Text>
+                              <Text fontSize="2xs" fontFamily="mono" color="rgba(255,255,255,0.8)" wordBreak="break-all">{frostSignature.s}</Text>
                             </Box>
                           </SimpleGrid>
                           <HStack mt={2} spacing={3} flexWrap="wrap">
@@ -434,7 +488,7 @@ export default function ResultsPage() {
                                 Signature Valid ✓
                               </Badge>
                             )}
-                            <Text fontSize="2xs" color="rgba(255,255,255,0.3)">
+                            <Text fontSize="2xs" color="rgba(255,255,255,0.45)">
                               Participants: Node {frostSignature.participatingNodes?.join(', Node ')}
                             </Text>
                           </HStack>
@@ -446,18 +500,18 @@ export default function ResultsPage() {
                           <Text fontSize="xs" color="#FF9B51" fontWeight={700} mb={2}>Taproot Transaction (BIP-341)</Text>
                           <SimpleGrid columns={{ base: 1, md: 2 }} spacing={2}>
                             <Box p={2} bg="rgba(0,0,0,0.3)" borderRadius="md" border="1px solid rgba(255,107,43,0.15)">
-                              <Text fontSize="2xs" color="rgba(255,255,255,0.4)">TxID</Text>
+                              <Text fontSize="2xs" color="rgba(255,255,255,0.55)">TxID</Text>
                               <Text fontSize="2xs" fontFamily="mono" color="#FF9B51" wordBreak="break-all">{bitcoinTx.txId}</Text>
                             </Box>
                             <Box p={2} bg="rgba(0,0,0,0.3)" borderRadius="md" border="1px solid rgba(255,107,43,0.15)">
-                              <Text fontSize="2xs" color="rgba(255,255,255,0.4)">OP_RETURN Inscription</Text>
-                              <Text fontSize="2xs" fontFamily="mono" color="rgba(255,255,255,0.7)">{bitcoinTx.opReturn}</Text>
+                              <Text fontSize="2xs" color="rgba(255,255,255,0.55)">OP_RETURN Inscription</Text>
+                              <Text fontSize="2xs" fontFamily="mono" color="rgba(255,255,255,0.8)">{bitcoinTx.opReturn}</Text>
                             </Box>
                           </SimpleGrid>
                           <HStack mt={2} spacing={3} flexWrap="wrap">
                             {taprootAddress?.testnet && (
-                              <Text fontSize="2xs" color="rgba(255,255,255,0.4)">
-                                P2TR: <Text as="span" fontFamily="mono" color="rgba(255,255,255,0.6)">{taprootAddress.testnet.slice(0, 20)}...</Text>
+                              <Text fontSize="2xs" color="rgba(255,255,255,0.55)">
+                                P2TR: <Text as="span" fontFamily="mono" color="rgba(255,255,255,0.75)">{taprootAddress.testnet.slice(0, 20)}...</Text>
                               </Text>
                             )}
                             {bitcoinTx.mempoolUrl && (
@@ -481,7 +535,7 @@ export default function ResultsPage() {
                                   {testnetInfo.network}
                                 </Badge>
                               </HStack>
-                              <Text fontSize="2xs" color="rgba(255,255,255,0.4)">
+                              <Text fontSize="2xs" color="rgba(255,255,255,0.55)">
                                 On-chain TXs: {testnetInfo.chain_stats?.tx_count ?? 0} · Mempool TXs: {testnetInfo.mempool_stats?.tx_count ?? 0}
                               </Text>
                             </VStack>
@@ -494,7 +548,7 @@ export default function ResultsPage() {
                       )}
 
                       {groupPubKey && (
-                        <Text fontSize="2xs" color="rgba(255,255,255,0.3)">
+                        <Text fontSize="2xs" color="rgba(255,255,255,0.45)">
                           FROST Group Key: {groupPubKey.slice(0, 24)}... · BIP-340 x-only
                         </Text>
                       )}
@@ -514,7 +568,7 @@ export default function ResultsPage() {
                       <Box flex={1} p={3}
                         bg="rgba(0,0,0,0.3)" border="1px solid rgba(255,255,255,0.08)"
                         borderRadius="md" fontFamily="mono" fontSize="xs"
-                        color="rgba(255,255,255,0.7)" overflowX="auto">
+                        color="rgba(255,255,255,0.8)" overflowX="auto">
                         {nostrNoteId}
                       </Box>
                       <Button leftIcon={<CopyIcon />} size="sm" onClick={handleCopy}
@@ -523,12 +577,91 @@ export default function ResultsPage() {
                         Copy
                       </Button>
                     </HStack>
-                    <Text fontSize="xs" color="rgba(255,255,255,0.4)">
+                    <Text fontSize="xs" color="rgba(255,255,255,0.5)">
                       Published to relay.damus.io, nos.lol, relay.nostr.band. Cryptographically signed — cannot be censored or deleted.
                     </Text>
                   </VStack>
                 </CardBody>
               </MotionCard>
+
+              {/* Merkle Proof */}
+              {merkleTree && (
+                <MotionCard variants={fadeUp} className="glass" borderLeft="4px solid #22C55E">
+                  <CardBody>
+                    <VStack align="start" spacing={3}>
+                      <HStack justify="space-between" w="full" flexWrap="wrap">
+                        <Heading as="h3" size="sm" color="white" fontFamily="heading">
+                          🌳 Merkle Integrity Proof
+                        </Heading>
+                        <Badge bg="rgba(34,197,94,0.15)" color="#22C55E" fontSize="xs" borderRadius="full" px={3}>
+                          SHA-256 · Depth {merkleTree.depth}
+                        </Badge>
+                      </HStack>
+                      <Box w="full" p={3} bg="rgba(0,0,0,0.3)" borderRadius="md" border="1px solid rgba(34,197,94,0.15)">
+                        <Text fontSize="2xs" color="rgba(255,255,255,0.55)" mb={1}>Merkle Root</Text>
+                        <Text fontSize="2xs" fontFamily="mono" color="#22C55E" wordBreak="break-all">{merkleTree.root}</Text>
+                      </Box>
+                      <SimpleGrid columns={{ base: 2, md: 3 }} spacing={2} w="full">
+                        <Box p={2} bg="rgba(0,0,0,0.2)" borderRadius="md" textAlign="center">
+                          <Text fontSize="2xs" color="rgba(255,255,255,0.55)">Leaves</Text>
+                          <Text fontSize="md" fontWeight={800} color="white">{merkleTree.leafCount}</Text>
+                        </Box>
+                        <Box p={2} bg="rgba(0,0,0,0.2)" borderRadius="md" textAlign="center">
+                          <Text fontSize="2xs" color="rgba(255,255,255,0.55)">Depth</Text>
+                          <Text fontSize="md" fontWeight={800} color="white">{merkleTree.depth}</Text>
+                        </Box>
+                        <Box p={2} bg="rgba(0,0,0,0.2)" borderRadius="md" textAlign="center">
+                          <Text fontSize="2xs" color="rgba(255,255,255,0.55)">Algorithm</Text>
+                          <Text fontSize="md" fontWeight={800} color="white">SHA-256</Text>
+                        </Box>
+                      </SimpleGrid>
+                      <Text fontSize="2xs" color="rgba(255,255,255,0.45)">
+                        Merkle tree commits all verdict data into a single root hash — tamper-evident integrity proof
+                      </Text>
+                    </VStack>
+                  </CardBody>
+                </MotionCard>
+              )}
+
+              {/* Tapscript Spending Paths */}
+              {tapscriptInfo && (
+                <MotionCard variants={fadeUp} className="glass" borderLeft="4px solid #F59E0B">
+                  <CardBody>
+                    <VStack align="start" spacing={3}>
+                      <HStack justify="space-between" w="full" flexWrap="wrap">
+                        <Heading as="h3" size="sm" color="white" fontFamily="heading">
+                          Tapscript Spending Paths (BIP-342)
+                        </Heading>
+                        <Badge bg="rgba(245,158,11,0.15)" color="#F59E0B" fontSize="xs" borderRadius="full" px={3}>
+                          {tapscriptInfo.scripts?.length || 0} Scripts
+                        </Badge>
+                      </HStack>
+                      <Box w="full" p={3} bg="rgba(0,0,0,0.3)" borderRadius="md" border="1px solid rgba(245,158,11,0.15)">
+                        <Text fontSize="2xs" color="rgba(255,255,255,0.55)" mb={1}>Script-Path Address</Text>
+                        <Text fontSize="2xs" fontFamily="mono" color="#F59E0B" wordBreak="break-all">{tapscriptInfo.address}</Text>
+                      </Box>
+                      <VStack spacing={2} w="full">
+                        {tapscriptInfo.scripts?.map((script, i) => (
+                          <HStack key={i} w="full" p={2} bg="rgba(0,0,0,0.2)" borderRadius="md" spacing={3}
+                            border="1px solid rgba(245,158,11,0.08)">
+                            <Box w="24px" h="24px" borderRadius="full" bg="rgba(245,158,11,0.15)"
+                              display="flex" alignItems="center" justifyContent="center" flexShrink={0}>
+                              <Text fontSize="xs" fontWeight={800} color="#F59E0B">{i + 1}</Text>
+                            </Box>
+                            <VStack align="start" spacing={0} flex={1}>
+                              <Text fontSize="xs" color="white" fontWeight={700}>{script.name}</Text>
+                              <Text fontSize="2xs" color="rgba(255,255,255,0.55)">{script.description}</Text>
+                            </VStack>
+                          </HStack>
+                        ))}
+                      </VStack>
+                      <Text fontSize="2xs" color="rgba(255,255,255,0.45)">
+                        Script Root: {tapscriptInfo.scriptRoot?.slice(0, 32)}...
+                      </Text>
+                    </VStack>
+                  </CardBody>
+                </MotionCard>
+              )}
 
               <Divider borderColor="rgba(255,255,255,0.08)" />
 
@@ -561,7 +694,7 @@ export default function ResultsPage() {
                 </SimpleGrid>
               </MotionBox>
 
-              <Text fontSize="xs" color="rgba(255,255,255,0.25)" textAlign="center">
+              <Text fontSize="xs" color="rgba(255,255,255,0.4)" textAlign="center">
                 Audit cost: {totalCost} sats · EIA + EPA + SEC EDGAR + Groq AI
               </Text>
 

@@ -368,6 +368,163 @@ class FROSTOracle {
   }
 
   /**
+   * Build a SHA-256 Merkle tree from an array of data items
+   * Returns the Merkle root + proof paths for each leaf
+   */
+  buildMerkleTree(dataItems) {
+    if (!Array.isArray(dataItems) || dataItems.length === 0) {
+      throw new Error('Merkle tree requires at least one data item')
+    }
+
+    // Create leaf hashes
+    const leaves = dataItems.map((item) => {
+      const serialized = typeof item === 'string' ? item : JSON.stringify(item)
+      return bytesToHex(sha256(new TextEncoder().encode(serialized)))
+    })
+
+    // Build tree bottom-up
+    const tree = [leaves]
+    let currentLevel = leaves
+
+    while (currentLevel.length > 1) {
+      const nextLevel = []
+      for (let i = 0; i < currentLevel.length; i += 2) {
+        const left = currentLevel[i]
+        const right = currentLevel[i + 1] || currentLevel[i] // duplicate last if odd
+        const combined = hexToBytes(left + right)
+        nextLevel.push(bytesToHex(sha256(combined)))
+      }
+      tree.push(nextLevel)
+      currentLevel = nextLevel
+    }
+
+    const root = currentLevel[0]
+
+    // Generate proof for each leaf
+    const proofs = leaves.map((_, leafIdx) => {
+      const proof = []
+      let idx = leafIdx
+      for (let level = 0; level < tree.length - 1; level++) {
+        const isRight = idx % 2 === 1
+        const siblingIdx = isRight ? idx - 1 : idx + 1
+        const sibling = tree[level][siblingIdx] || tree[level][idx]
+        proof.push({ hash: sibling, position: isRight ? 'left' : 'right' })
+        idx = Math.floor(idx / 2)
+      }
+      return proof
+    })
+
+    return {
+      root,
+      leaves,
+      depth: tree.length - 1,
+      leafCount: leaves.length,
+      proofs,
+      tree: tree.map((level) => level.length), // level sizes for display
+    }
+  }
+
+  /**
+   * Verify a Merkle proof for a given leaf hash
+   */
+  verifyMerkleProof(leafHash, proof, root) {
+    let hash = leafHash
+    for (const step of proof) {
+      const combined = step.position === 'left'
+        ? hexToBytes(step.hash + hash)
+        : hexToBytes(hash + step.hash)
+      hash = bytesToHex(sha256(combined))
+    }
+    return hash === root
+  }
+
+  /**
+   * Generate Tapscript spending paths (BIP-342)
+   * Creates a script tree with multiple spending conditions:
+   *   - Key-path: FROST aggregate key (default, always works)
+   *   - Script-path 1: Bounty claim after timelock (CLTV)
+   *   - Script-path 2: Emergency multi-sig recovery
+   *   - Script-path 3: Verdict hash commitment (OP_RETURN alternative)
+   */
+  generateTapscript(verdictHash) {
+    const internalKey = pointToXOnly(this.groupPubKey)
+    const internalKeyHex = bytesToHex(internalKey)
+
+    // Script 1: Bounty claim with timelock
+    // OP_CHECKLOCKTIMEVERIFY + OP_DROP + <pubkey> + OP_CHECKSIG
+    const timelockBlocks = 144 // ~24 hours on testnet
+    const timelockHex = timelockBlocks.toString(16).padStart(8, '0')
+    const bountyClaimScript = `${timelockHex}b175${internalKeyHex}ac`
+    // b1 = OP_CLTV, 75 = OP_DROP, ac = OP_CHECKSIG
+
+    // Script 2: 2-of-3 multi-sig recovery using node keys
+    const node1Key = this.nodes[0].xOnlyPubKey
+    const node2Key = this.nodes[1].xOnlyPubKey
+    const node3Key = this.nodes[2].xOnlyPubKey
+    const multiSigScript = `20${node1Key}ac7c20${node2Key}ac937c20${node3Key}ac9368`
+    // 20 = push 32 bytes, ac = OP_CHECKSIG, 7c = OP_SWAP, 93 = OP_ADD, 68 = OP_2
+
+    // Script 3: Verdict commitment (hash lock)
+    const verdictHashHex = verdictHash || bytesToHex(sha256(new TextEncoder().encode('VERIDION-X')))
+    const hashLockScript = `a820${verdictHashHex}8820${internalKeyHex}ac`
+    // a8 = OP_SHA256, 88 = OP_EQUALVERIFY, ac = OP_CHECKSIG
+
+    // Build TapBranch tree: hash each script leaf, then combine
+    const leaf1Hash = bytesToHex(taggedHash('TapLeaf', new Uint8Array([0xc0]), hexToBytes(bountyClaimScript)))
+    const leaf2Hash = bytesToHex(taggedHash('TapLeaf', new Uint8Array([0xc0]), hexToBytes(multiSigScript)))
+    const leaf3Hash = bytesToHex(taggedHash('TapLeaf', new Uint8Array([0xc0]), hexToBytes(hashLockScript)))
+
+    // Branch: hash(leaf1, leaf2)
+    const [sortedL1, sortedL2] = leaf1Hash < leaf2Hash ? [leaf1Hash, leaf2Hash] : [leaf2Hash, leaf1Hash]
+    const branchHash = bytesToHex(taggedHash('TapBranch', hexToBytes(sortedL1), hexToBytes(sortedL2)))
+
+    // Root: hash(branch, leaf3)
+    const [sortedB, sortedL3] = branchHash < leaf3Hash ? [branchHash, leaf3Hash] : [leaf3Hash, branchHash]
+    const scriptRoot = bytesToHex(taggedHash('TapBranch', hexToBytes(sortedB), hexToBytes(sortedL3)))
+
+    // Tweaked key: P + H("TapTweak" || P || scriptRoot) * G
+    const tweakHash = taggedHash('TapTweak', internalKey, hexToBytes(scriptRoot))
+    const tweak = mod(BigInt('0x' + bytesToHex(tweakHash)))
+    const tweakPoint = G.multiply(tweak)
+    const Q = this.groupPubKey.add(tweakPoint)
+    const Q_x = pointToXOnly(Q)
+
+    // Generate Taproot address with script tree
+    const testWords = bech32m.toWords(Buffer.from(Q_x))
+    testWords.unshift(1)
+    const scriptAddress = bech32m.encode('tb', testWords)
+
+    return {
+      address: scriptAddress,
+      internalKey: internalKeyHex,
+      outputKey: bytesToHex(Q_x),
+      scriptRoot,
+      scripts: [
+        {
+          name: 'Bounty Claim (Timelock)',
+          script: bountyClaimScript,
+          leafHash: leaf1Hash,
+          description: `Claimable after ${timelockBlocks} blocks (~24h) with FROST key signature`,
+        },
+        {
+          name: 'Multi-Sig Recovery',
+          script: multiSigScript,
+          leafHash: leaf2Hash,
+          description: '2-of-3 oracle node key recovery path',
+        },
+        {
+          name: 'Verdict Hash Lock',
+          script: hashLockScript,
+          leafHash: leaf3Hash,
+          description: 'Unlock by revealing verdict preimage + key signature',
+        },
+      ],
+      tweak: bytesToHex(tweakHash),
+      depth: 2, // tree depth
+    }
+  }
+
+  /**
    * Verify a BIP-340 Schnorr signature against the group public key
    * Used for independent verification of FROST-signed verdicts
    */
