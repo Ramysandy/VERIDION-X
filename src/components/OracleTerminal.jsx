@@ -17,11 +17,30 @@ const LOG_COLORS = {
   detail: 'rgba(255,255,255,0.4)',
 }
 
+const LOG_PREFIX = {
+  system: '│',
+  crypto: '🔐',
+  fetch: '→',
+  data: '←',
+  ai: '◆',
+  alert: '⚠',
+  success: '✓',
+  warn: '!',
+  error: '✗',
+  detail: '·',
+}
+
 const STATUS_COLORS = {
   waiting: '#6B7280',
   running: '#FBBF24',
   done: '#22C55E',
   error: '#EF4444',
+}
+
+const NODE_COLORS = {
+  1: '#FF6B2B',
+  2: '#A78BFA',
+  3: '#22D3EE',
 }
 
 export default function OracleTerminal({ nodeId, logs = [], status = 'waiting' }) {
@@ -33,65 +52,84 @@ export default function OracleTerminal({ nodeId, logs = [], status = 'waiting' }
     }
   }, [logs.length])
 
+  const nodeColor = NODE_COLORS[nodeId] || '#FF6B2B'
+
   const borderColor =
     status === 'done'
-      ? 'rgba(34,197,94,0.3)'
+      ? 'rgba(34,197,94,0.35)'
       : status === 'running'
-      ? 'rgba(251,191,36,0.3)'
-      : 'rgba(255,255,255,0.08)'
+      ? `${nodeColor}44`
+      : 'rgba(255,255,255,0.06)'
 
   return (
     <MotionBox
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, delay: nodeId * 0.1 }}
-      bg="rgba(0,0,0,0.5)"
+      transition={{ duration: 0.5, delay: (nodeId - 1) * 0.12 }}
+      bg="rgba(0,0,0,0.6)"
       border="1px solid"
       borderColor={borderColor}
       borderRadius="xl"
       overflow="hidden"
-      backdropFilter="blur(12px)"
-      h={{ base: '220px', md: '300px' }}
+      backdropFilter="blur(16px)"
+      h={{ base: '240px', md: '320px' }}
+      position="relative"
+      _before={status === 'running' ? {
+        content: '""',
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        h: '2px',
+        bg: `linear-gradient(90deg, transparent, ${nodeColor}, transparent)`,
+        animation: 'shimmer 2s infinite',
+      } : {}}
     >
       {/* Terminal header */}
       <HStack
         px={3}
         py={2}
-        bg="rgba(0,0,0,0.4)"
+        bg="rgba(0,0,0,0.5)"
         borderBottom="1px solid rgba(255,255,255,0.05)"
         spacing={2}
       >
-        <Box
-          w="8px"
-          h="8px"
-          borderRadius="full"
-          bg={STATUS_COLORS[status]}
-          boxShadow={status === 'running' ? `0 0 8px ${STATUS_COLORS[status]}` : 'none'}
-          className={status === 'running' ? 'pulse-dot' : ''}
-        />
+        {/* Mac-style dots */}
+        <HStack spacing={1}>
+          <Box w="6px" h="6px" borderRadius="full" bg={status === 'done' ? '#22C55E' : status === 'running' ? nodeColor : 'rgba(255,255,255,0.15)'} />
+          <Box w="6px" h="6px" borderRadius="full" bg={status === 'running' ? `${nodeColor}88` : 'rgba(255,255,255,0.08)'} />
+          <Box w="6px" h="6px" borderRadius="full" bg="rgba(255,255,255,0.08)" />
+        </HStack>
         <Text
-          color="rgba(255,255,255,0.45)"
+          color={status === 'running' ? nodeColor : 'rgba(255,255,255,0.4)'}
           fontSize="2xs"
           fontWeight={700}
-          letterSpacing="0.1em"
+          letterSpacing="0.12em"
           fontFamily="'JetBrains Mono', 'Fira Code', monospace"
         >
-          ORACLE NODE {nodeId}
+          NODE-{nodeId}
         </Text>
         <Box flex={1} />
-        <Text
-          color={STATUS_COLORS[status]}
-          fontSize="2xs"
-          fontFamily="'JetBrains Mono', monospace"
+        {logs.length > 0 && (
+          <Text fontSize="2xs" color="rgba(255,255,255,0.2)" fontFamily="'JetBrains Mono', monospace">
+            {logs.length} ops
+          </Text>
+        )}
+        <Box
+          px={2} py={0.5}
+          borderRadius="sm"
+          bg={status === 'done' ? 'rgba(34,197,94,0.15)' : status === 'running' ? `${nodeColor}15` : 'rgba(255,255,255,0.05)'}
+          border="1px solid"
+          borderColor={status === 'done' ? 'rgba(34,197,94,0.25)' : status === 'running' ? `${nodeColor}30` : 'rgba(255,255,255,0.08)'}
         >
-          {status === 'waiting'
-            ? 'STANDBY'
-            : status === 'running'
-            ? 'EXECUTING'
-            : status === 'done'
-            ? 'COMPLETE'
-            : 'ERROR'}
-        </Text>
+          <Text
+            color={status === 'done' ? '#22C55E' : status === 'running' ? nodeColor : '#6B7280'}
+            fontSize="2xs"
+            fontFamily="'JetBrains Mono', monospace"
+            fontWeight={600}
+          >
+            {status === 'waiting' ? 'IDLE' : status === 'running' ? 'LIVE' : status === 'done' ? 'DONE' : 'ERR'}
+          </Text>
+        </Box>
       </HStack>
 
       {/* Terminal body */}
@@ -102,32 +140,34 @@ export default function OracleTerminal({ nodeId, logs = [], status = 'waiting' }
         overflowY="auto"
         h="calc(100% - 36px)"
         css={{
-          '&::-webkit-scrollbar': { width: '4px' },
+          '&::-webkit-scrollbar': { width: '3px' },
           '&::-webkit-scrollbar-track': { background: 'transparent' },
           '&::-webkit-scrollbar-thumb': {
-            background: 'rgba(255,255,255,0.1)',
+            background: 'rgba(255,255,255,0.08)',
             borderRadius: '4px',
           },
         }}
       >
         <VStack align="start" spacing={0}>
           {logs.length === 0 && (
-            <Text
-              color="rgba(255,255,255,0.2)"
-              fontSize="2xs"
-              fontFamily="'JetBrains Mono', monospace"
-            >
-              Awaiting execution...
-            </Text>
+            <VStack align="start" spacing={1} w="full" py={4}>
+              <Text color="rgba(255,255,255,0.12)" fontSize="2xs" fontFamily="'JetBrains Mono', monospace">
+                $ frost-oracle --node {nodeId} --threshold 2/3
+              </Text>
+              <Text color="rgba(255,255,255,0.08)" fontSize="2xs" fontFamily="'JetBrains Mono', monospace">
+                Waiting for audit trigger...
+              </Text>
+            </VStack>
           )}
           {logs.map((log, i) => (
-            <HStack key={i} spacing={2} align="start" w="full">
+            <HStack key={i} spacing={0} align="start" w="full" py="1px">
               <Text
-                color="rgba(255,255,255,0.2)"
-                fontSize="2xs"
+                color="rgba(255,255,255,0.15)"
+                fontSize="10px"
                 fontFamily="'JetBrains Mono', monospace"
                 flexShrink={0}
-                minW="70px"
+                w="52px"
+                lineHeight={1.7}
               >
                 {new Date(log.ts).toLocaleTimeString('en-US', {
                   hour12: false,
@@ -138,25 +178,33 @@ export default function OracleTerminal({ nodeId, logs = [], status = 'waiting' }
               </Text>
               <Text
                 color={LOG_COLORS[log.type] || 'rgba(255,255,255,0.5)'}
-                fontSize="2xs"
+                fontSize="10px"
                 fontFamily="'JetBrains Mono', monospace"
-                lineHeight={1.6}
-                wordBreak="break-all"
+                w="16px"
+                flexShrink={0}
+                textAlign="center"
+                lineHeight={1.7}
               >
-                {log.type === 'alert' && '⚠ '}
-                {log.type === 'success' && '✓ '}
-                {log.type === 'crypto' && '🔑 '}
-                {log.type === 'ai' && '🤖 '}
+                {LOG_PREFIX[log.type] || '│'}
+              </Text>
+              <Text
+                color={LOG_COLORS[log.type] || 'rgba(255,255,255,0.5)'}
+                fontSize="10px"
+                fontFamily="'JetBrains Mono', monospace"
+                lineHeight={1.7}
+                wordBreak="break-word"
+              >
                 {log.message}
               </Text>
             </HStack>
           ))}
           {status === 'running' && (
             <Text
-              color="rgba(255,255,255,0.3)"
-              fontSize="2xs"
+              color={`${nodeColor}66`}
+              fontSize="10px"
               fontFamily="'JetBrains Mono', monospace"
               className="cursor-blink"
+              mt={1}
             >
               █
             </Text>

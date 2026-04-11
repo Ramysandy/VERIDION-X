@@ -1,6 +1,6 @@
 import {
   Container, VStack, HStack, Heading, Text, Card, CardBody,
-  Badge, Box, SimpleGrid, Divider,
+  Badge, Box, SimpleGrid, Divider, Button,
 } from '@chakra-ui/react'
 import { useEffect, useState, useRef } from 'react'
 import { motion } from 'framer-motion'
@@ -36,15 +36,34 @@ export default function AuditFlowPage() {
   const [signature, setSignature] = useState(null)
   const [transaction, setTransaction] = useState(null)
   const [phase, setPhase] = useState('CONNECTING') // CONNECTING, RUNNING, CONSENSUS, SIGNING, COMPLETE, ERROR
+  const phaseRef = useRef('CONNECTING')
+  const [retryCount, setRetryCount] = useState(0)
 
   useEffect(() => {
-    if (!targetCompany || hasStarted.current) return
+    if (!targetCompany) return
+    // Reset on retry
+    if (retryCount > 0) {
+      hasStarted.current = false
+    }
+    if (hasStarted.current) return
     hasStarted.current = true
+
+    // Reset state
+    setNodeLogs({ 1: [], 2: [], 3: [] })
+    setNodeStatus({ 1: 'waiting', 2: 'waiting', 3: 'waiting' })
+    setOracleInit(null)
+    setConsensus(null)
+    setSignature(null)
+    setTransaction(null)
+    setPhase('CONNECTING')
+    phaseRef.current = 'CONNECTING'
 
     setClaimData({ company: targetCompany, claim: `${targetCompany}'s commitment to 100% renewable energy and carbon neutrality` })
 
-    const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:3001'
-    const source = new EventSource(`${apiBase}/api/oracle/stream?company=${encodeURIComponent(targetCompany)}`)
+    // VITE_API_URL already includes /api — strip it for SSE base, or fall back
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
+    const baseUrl = apiUrl.replace(/\/api\/?$/, '')
+    const source = new EventSource(`${baseUrl}/api/oracle/stream?company=${encodeURIComponent(targetCompany)}`)
 
     source.addEventListener('init', (e) => {
       const data = JSON.parse(e.data)
@@ -52,6 +71,7 @@ export default function AuditFlowPage() {
       setTaprootAddress(data.taproot)
       setGroupPubKey(data.groupPubKey)
       setPhase('RUNNING')
+      phaseRef.current = 'RUNNING'
       setNodeStatus({ 1: 'running', 2: 'running', 3: 'running' })
     })
 
@@ -69,6 +89,7 @@ export default function AuditFlowPage() {
       const data = JSON.parse(e.data)
       setConsensus(data)
       setPhase('CONSENSUS')
+      phaseRef.current = 'CONSENSUS'
       // Mark all nodes done
       setNodeStatus({ 1: 'done', 2: 'done', 3: 'done' })
     })
@@ -86,6 +107,7 @@ export default function AuditFlowPage() {
       setSignature(data)
       setFrostSignature(data)
       setPhase('SIGNING')
+      phaseRef.current = 'SIGNING'
     })
 
     source.addEventListener('transaction', (e) => {
@@ -98,6 +120,7 @@ export default function AuditFlowPage() {
       const data = JSON.parse(e.data)
       source.close()
       setPhase('COMPLETE')
+      phaseRef.current = 'COMPLETE'
 
       // Populate store for ResultsPage
       const v = data.verdict || {}
@@ -137,22 +160,31 @@ export default function AuditFlowPage() {
     })
 
     source.addEventListener('error', (e) => {
-      // SSE connection error
+      // SSE connection error — only handle if not completed
       if (source.readyState === EventSource.CLOSED) return
+      if (phaseRef.current === 'COMPLETE' || phaseRef.current === 'SIGNING') return
       try {
-        const data = JSON.parse(e.data)
-        setError(data.message)
+        if (e.data) {
+          const data = JSON.parse(e.data)
+          setError(data.message)
+        }
       } catch { /* SSE reconnect attempt */ }
     })
 
     source.onerror = () => {
-      if (phase === 'COMPLETE') return
-      setPhase('ERROR')
+      // SSE fires onerror when server closes connection after complete — ignore those
+      if (phaseRef.current === 'COMPLETE' || phaseRef.current === 'SIGNING' || phaseRef.current === 'CONSENSUS') return
+      if (source.readyState === EventSource.CLOSED) return
+      // Only set error if we never got past CONNECTING
+      if (phaseRef.current === 'CONNECTING') {
+        setPhase('ERROR')
+        phaseRef.current = 'ERROR'
+      }
       source.close()
     }
 
     return () => source.close()
-  }, [targetCompany])
+  }, [targetCompany, retryCount])
 
   const phaseLabel = {
     CONNECTING: 'Connecting to Oracle Network...',
@@ -172,6 +204,13 @@ export default function AuditFlowPage() {
     ERROR: '#EF4444',
   }
 
+  const PHASES = ['CONNECTING', 'RUNNING', 'CONSENSUS', 'SIGNING', 'COMPLETE']
+  const phaseIdx = PHASES.indexOf(phase)
+
+  const handleRetry = () => {
+    setRetryCount(c => c + 1)
+  }
+
   return (
     <Box className="aurora-bg grid-bg" minH="100vh" py={8} position="relative" overflow="hidden">
       <Box className="orb orb-orange" w="400px" h="400px" top="-80px" right="-80px" />
@@ -183,28 +222,60 @@ export default function AuditFlowPage() {
           {/* Header card */}
           <Card className="glass" border="1px solid rgba(255,107,43,0.2)">
             <CardBody py={4}>
-              <HStack justify="space-between" align="center" flexWrap="wrap" gap={3}>
-                <VStack align="start" spacing={1}>
-                  <HStack spacing={3}>
-                    <Text fontSize="xs" color="rgba(255,255,255,0.4)" textTransform="uppercase" letterSpacing="0.1em">FROST Oracle Audit</Text>
-                    <Badge bg="rgba(167,139,250,0.15)" color="#A78BFA" fontSize="2xs" borderRadius="full" px={2}>2-of-3 Threshold</Badge>
-                  </HStack>
-                  <Heading as="h2" size="lg" color="white" fontFamily="heading">{targetCompany}</Heading>
-                </VStack>
-                <VStack align="end" spacing={0}>
-                  <Badge
-                    bg={`${phaseColor[phase]}22`} color={phaseColor[phase]}
-                    border="1px solid" borderColor={`${phaseColor[phase]}44`}
-                    px={3} py={1} fontSize="xs" borderRadius="full">
-                    {phaseLabel[phase]}
-                  </Badge>
-                  {oracleInit?.taproot?.testnet && (
-                    <Text fontSize="2xs" color="rgba(255,255,255,0.3)" fontFamily="mono" mt={1}>
-                      P2TR: {oracleInit.taproot.testnet.slice(0, 14)}...{oracleInit.taproot.testnet.slice(-6)}
-                    </Text>
-                  )}
-                </VStack>
-              </HStack>
+              <VStack spacing={3} align="stretch">
+                <HStack justify="space-between" align="center" flexWrap="wrap" gap={3}>
+                  <VStack align="start" spacing={1}>
+                    <HStack spacing={3}>
+                      <Text fontSize="xs" color="rgba(255,255,255,0.4)" textTransform="uppercase" letterSpacing="0.1em">FROST Oracle Audit</Text>
+                      <Badge bg="rgba(167,139,250,0.15)" color="#A78BFA" fontSize="2xs" borderRadius="full" px={2}>2-of-3 Threshold</Badge>
+                    </HStack>
+                    <Heading as="h2" size="lg" color="white" fontFamily="heading">{targetCompany}</Heading>
+                  </VStack>
+                  <VStack align="end" spacing={0}>
+                    {phase === 'ERROR' ? (
+                      <Button size="sm" bg="rgba(239,68,68,0.15)" color="#EF4444" border="1px solid rgba(239,68,68,0.3)" borderRadius="full" onClick={handleRetry} _hover={{ bg: 'rgba(239,68,68,0.25)' }}>
+                        Retry Oracle
+                      </Button>
+                    ) : (
+                      <Badge
+                        bg={`${phaseColor[phase]}22`} color={phaseColor[phase]}
+                        border="1px solid" borderColor={`${phaseColor[phase]}44`}
+                        px={3} py={1} fontSize="xs" borderRadius="full">
+                        {phaseLabel[phase]}
+                      </Badge>
+                    )}
+                    {oracleInit?.taproot?.testnet && (
+                      <Text fontSize="2xs" color="rgba(255,255,255,0.3)" fontFamily="mono" mt={1}>
+                        P2TR: {oracleInit.taproot.testnet.slice(0, 14)}...{oracleInit.taproot.testnet.slice(-6)}
+                      </Text>
+                    )}
+                  </VStack>
+                </HStack>
+
+                {/* Progress timeline */}
+                <HStack spacing={0} w="full" pt={1}>
+                  {['Connect', 'Execute', 'Consensus', 'Sign', 'Done'].map((label, i) => (
+                    <HStack key={label} flex={1} spacing={0}>
+                      <VStack spacing={0.5}>
+                        <Box
+                          w="20px" h="20px" borderRadius="full"
+                          bg={i <= phaseIdx ? `${phaseColor[phase]}` : 'rgba(255,255,255,0.06)'}
+                          border="2px solid"
+                          borderColor={i <= phaseIdx ? `${phaseColor[phase]}` : 'rgba(255,255,255,0.1)'}
+                          display="flex" alignItems="center" justifyContent="center"
+                          boxShadow={i === phaseIdx ? `0 0 12px ${phaseColor[phase]}44` : 'none'}
+                        >
+                          <Text fontSize="8px" color={i <= phaseIdx ? 'white' : 'rgba(255,255,255,0.3)'} fontWeight={800}>{i + 1}</Text>
+                        </Box>
+                        <Text fontSize="8px" color={i <= phaseIdx ? phaseColor[phase] : 'rgba(255,255,255,0.25)'} fontWeight={i === phaseIdx ? 700 : 400} letterSpacing="0.05em">{label}</Text>
+                      </VStack>
+                      {i < 4 && (
+                        <Box flex={1} h="2px" mx={1} bg={i < phaseIdx ? phaseColor[phase] : 'rgba(255,255,255,0.06)'} borderRadius="full" />
+                      )}
+                    </HStack>
+                  ))}
+                </HStack>
+              </VStack>
             </CardBody>
           </Card>
 

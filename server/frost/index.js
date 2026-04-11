@@ -366,6 +366,44 @@ class FROSTOracle {
       inscriptionUrl: `https://mempool.space/testnet/tx/${txId}#vout=1`,
     }
   }
+
+  /**
+   * Verify a BIP-340 Schnorr signature against the group public key
+   * Used for independent verification of FROST-signed verdicts
+   */
+  verifySignature(signatureHex, message) {
+    if (!this.initialized) throw new Error('Oracle not initialized')
+    const R_hex = signatureHex.slice(0, 64)
+    const s_hex = signatureHex.slice(64)
+
+    const R_bytes = hexToBytes(R_hex)
+    const s_val = BigInt('0x' + s_hex)
+    const P_x = pointToXOnly(this.groupPubKey)
+    const m = sha256(new TextEncoder().encode(message))
+
+    // BIP-340 challenge: e = H("BIP0340/challenge" || R || P || m)
+    const e = mod(
+      BigInt('0x' + bytesToHex(taggedHash('BIP0340/challenge', R_bytes, P_x, m)))
+    )
+
+    // Verify: s·G == R + e·P
+    const sG = G.multiply(s_val)
+    const R_point = Point.fromHex('02' + R_hex)
+    const eP = this.groupPubKey.multiply(e)
+    const expected = R_point.add(eP)
+
+    const valid =
+      bytesToHex(pointToXOnly(sG)) === bytesToHex(pointToXOnly(expected))
+
+    return {
+      valid,
+      aggregatePubKey: this.xOnlyGroupKey,
+      messageHash: bytesToHex(m),
+      challenge: bytesToHex(scalarToBytes(e)).slice(0, 32) + '...',
+      R: R_hex,
+      s: s_hex,
+    }
+  }
 }
 
 // Singleton instance

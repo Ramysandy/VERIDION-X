@@ -23,7 +23,7 @@ function AppContent() {
     }
   }, [targetCompany, claim, navigate])
 
-  const showResults = auditPhase === 'COMPLETE' || auditPhase === 'ERROR'
+  const showResults = auditPhase === 'COMPLETE' || auditPhase === 'ERROR' || !!useAuditStore.getState().verdict
   const hasAudit = !!(targetCompany || claim)
 
   return (
