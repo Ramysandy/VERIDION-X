@@ -31,9 +31,12 @@ import {
   ResponsiveContainer, Cell, ReferenceLine,
 } from 'recharts'
 import { useEffect, useState, useRef } from 'react'
+import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { useAuditStore } from '../store/auditStore'
 import { eiaAPI, epaAPI, groqAPI, nostrAPI, secAPI } from '../api/client'
+
+const MotionBox = motion(Box)
 
 const phases = [
   'IDLE', 'EXTRACTING_CLAIM', 'FETCHING_EIA', 'LOADING_EPA',
@@ -152,26 +155,36 @@ export default function AuditFlowPage() {
   }, [claim])
 
   return (
-    <Box bg="brand.light" minH="100vh" py={8}>
-      <Container maxW="container.lg">
-        <VStack spacing={8} align="stretch">
+    <Box className="aurora-bg grid-bg" minH="100vh" py={8} position="relative" overflow="hidden">
+      <Box className="orb orb-orange" w="400px" h="400px" top="-80px" right="-80px" />
+      <Box className="orb orb-purple" w="280px" h="280px" bottom="60px" left="-40px" />
+      <Container maxW="container.lg" position="relative" zIndex={1}>
+        <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} transition={{ duration:0.4 }}>
+        <VStack spacing={6} align="stretch">
           {error && (
-            <Alert status="warning" borderRadius="md">
-              <AlertIcon />
-              <AlertDescription>{error} — continuing with available data</AlertDescription>
+            <Alert status="warning" borderRadius="xl"
+              bg="rgba(251,191,36,0.1)" border="1px solid rgba(251,191,36,0.25)">
+              <AlertIcon color="#FBBF24" />
+              <AlertDescription color="rgba(255,255,255,0.8)" fontSize="sm">{error} — continuing with available data</AlertDescription>
             </Alert>
           )}
 
           {/* Company Info */}
-          <Card bg="white">
+          <Card className="glass" border="1px solid rgba(255,107,43,0.2)">
             <CardBody>
               <HStack justify="space-between" align="start">
                 <VStack align="start" spacing={2}>
-                  <Text fontSize="sm" color="brand.dark" opacity={0.6}>Auditing</Text>
-                  <Heading as="h2" size="lg" color="brand.dark" fontFamily="heading">{claim?.company}</Heading>
-                  <Text fontSize="sm" color="brand.dark" opacity={0.7} maxW="450px" noOfLines={2}>"{claim?.claim}"</Text>
+                  <Text fontSize="xs" color="rgba(255,255,255,0.4)" textTransform="uppercase" letterSpacing="0.1em">Auditing</Text>
+                  <Heading as="h2" size="lg" color="white" fontFamily="heading">{claim?.company}</Heading>
+                  <Text fontSize="sm" color="rgba(255,255,255,0.55)" maxW="450px" noOfLines={2}>"{claim?.claim}"</Text>
                 </VStack>
-                <Badge colorScheme={auditPhase === 'COMPLETE' ? 'green' : auditPhase === 'ERROR' ? 'red' : 'orange'} px={4} py={2} fontSize="sm">
+                <Badge
+                  bg={auditPhase === 'COMPLETE' ? 'rgba(34,197,94,0.15)' : auditPhase === 'ERROR' ? 'rgba(239,68,68,0.15)' : 'rgba(255,107,43,0.15)'}
+                  color={auditPhase === 'COMPLETE' ? '#22C55E' : auditPhase === 'ERROR' ? '#EF4444' : '#FF9B51'}
+                  border="1px solid"
+                  borderColor={auditPhase === 'COMPLETE' ? 'rgba(34,197,94,0.3)' : auditPhase === 'ERROR' ? 'rgba(239,68,68,0.3)' : 'rgba(255,107,43,0.3)'}
+                  px={4} py={2} fontSize="xs" borderRadius="full"
+                >
                   {phaseLabels[auditPhase] || auditPhase}
                 </Badge>
               </HStack>
@@ -179,19 +192,27 @@ export default function AuditFlowPage() {
           </Card>
 
           {/* Progress */}
-          <Card bg="white">
+          <Card className="glass" border="1px solid rgba(255,107,43,0.15)">
             <CardBody>
-              <VStack spacing={3} align="start">
+              <VStack spacing={4} align="start">
                 <HStack justify="space-between" w="full">
-                  <Text fontWeight={700} color="brand.dark" fontSize="sm">Audit Progress</Text>
-                  <Text fontWeight={700} color="brand.accent" fontSize="sm">{progress}%</Text>
+                  <Text fontWeight={700} color="rgba(255,255,255,0.8)" fontSize="xs" textTransform="uppercase" letterSpacing="0.1em">Audit Progress</Text>
+                  <Text fontWeight={800} color="#FF6B2B" fontSize="lg">{progress}%</Text>
                 </HStack>
-                <Progress value={progress} width="full" colorScheme="orange" hasStripe={progress < 100} isAnimated={progress < 100} borderRadius="full" size="md" />
+                <Box w="full" h="6px" bg="rgba(255,255,255,0.08)" borderRadius="full" overflow="hidden">
+                  <MotionBox
+                    h="full" borderRadius="full"
+                    bg="linear-gradient(to right, #FF6B2B, #FBBF24)"
+                    initial={{ width: 0 }}
+                    animate={{ width: `${progress}%` }}
+                    transition={{ duration: 0.8, ease: 'easeOut' }}
+                  />
+                </Box>
                 <SimpleGrid columns={7} spacing={1} w="full">
                   {['EIA', 'EPA', 'SEC', 'AI Verdict', 'Narrative', 'Nostr', 'Done'].map((step, i) => (
                     <Text key={step} fontSize="9px" textAlign="center"
-                      color={progress >= ((i + 1) / 7) * 100 ? 'brand.accent' : 'brand.dark'}
-                      opacity={progress >= ((i + 1) / 7) * 100 ? 1 : 0.4} fontWeight={700}>
+                      color={progress >= ((i + 1) / 7) * 100 ? '#FF6B2B' : 'rgba(255,255,255,0.3)'}
+                      fontWeight={progress >= ((i + 1) / 7) * 100 ? 800 : 400}>
                       {step}
                     </Text>
                   ))}
@@ -202,24 +223,23 @@ export default function AuditFlowPage() {
 
           {/* Data Tabs */}
           <Tabs variant="soft-rounded" colorScheme="orange">
-            <TabList bg="white" p={3} borderRadius="lg" gap={2} flexWrap="wrap">
-              <Tab color="brand.dark" _selected={{ bg: 'brand.accent', color: 'white' }}>Claim</Tab>
-              <Tab color="brand.dark" _selected={{ bg: 'brand.accent', color: 'white' }}>EIA {eiaData && '✓'}</Tab>
-              <Tab color="brand.dark" _selected={{ bg: 'brand.accent', color: 'white' }}>EPA {epaData && '✓'}</Tab>
-              <Tab color="brand.dark" _selected={{ bg: 'brand.accent', color: 'white' }}>SEC EDGAR {secData && '✓'}</Tab>
+            <TabList className="glass" p={3} borderRadius="lg" gap={2} flexWrap="wrap" border="1px solid rgba(255,107,43,0.15)">
+              <Tab color="rgba(255,255,255,0.6)" _selected={{ bg: '#FF6B2B', color: 'white' }}>Claim</Tab>
+              <Tab color="rgba(255,255,255,0.6)" _selected={{ bg: '#FF6B2B', color: 'white' }}>EIA {eiaData && '✓'}</Tab>
+              <Tab color="rgba(255,255,255,0.6)" _selected={{ bg: '#FF6B2B', color: 'white' }}>EPA {epaData && '✓'}</Tab>
+              <Tab color="rgba(255,255,255,0.6)" _selected={{ bg: '#FF6B2B', color: 'white' }}>SEC EDGAR {secData && '✓'}</Tab>
             </TabList>
             <TabPanels>
-              {/* Claim Tab */}
               <TabPanel>
-                <Card bg="white">
+                <Card className="glass" border="1px solid rgba(255,107,43,0.15)">
                   <CardBody>
                     <VStack align="start" spacing={3}>
-                      <Text color="brand.dark" fontWeight={700} fontSize="md">Company ESG Claim</Text>
-                      <Text color="brand.dark" lineHeight="tall">"{claim?.claim}"</Text>
+                      <Text color="white" fontWeight={700} fontSize="md">Company ESG Claim</Text>
+                      <Text color="rgba(255,255,255,0.7)" lineHeight="tall">"{claim?.claim}"</Text>
                       <HStack spacing={3} flexWrap="wrap">
-                        <Badge colorScheme="orange">Claimed Renewable: {claim?.claimedRenewable}%</Badge>
-                        <Badge colorScheme="blue">{claim?.location}</Badge>
-                        <Badge colorScheme="gray">{claim?.year}</Badge>
+                        <Badge bg="rgba(255,107,43,0.15)" color="#FF9B51" borderRadius="full" px={3}>Claimed Renewable: {claim?.claimedRenewable}%</Badge>
+                        <Badge bg="rgba(34,211,238,0.1)" color="#22D3EE" borderRadius="full" px={3}>{claim?.location}</Badge>
+                        <Badge bg="rgba(255,255,255,0.08)" color="rgba(255,255,255,0.6)" borderRadius="full" px={3}>{claim?.year}</Badge>
                       </HStack>
                     </VStack>
                   </CardBody>
@@ -228,22 +248,22 @@ export default function AuditFlowPage() {
 
               {/* EIA Tab */}
               <TabPanel>
-                <Card bg="white">
+                <Card className="glass" border="1px solid rgba(255,107,43,0.15)">
                   <CardBody>
                     {eiaData ? (
                       <VStack align="start" spacing={4}>
-                        <Text color="brand.dark" fontWeight={700} fontSize="md">EIA Energy Grid — Claimed vs Actual</Text>
+                        <Text color="white" fontWeight={700} fontSize="md">EIA Energy Grid — Claimed vs Actual</Text>
                         <SimpleGrid columns={2} spacing={4} w="full">
-                          <Stat><StatLabel color="brand.dark" fontSize="sm">Actual Renewable %</StatLabel><StatNumber color="brand.accent">{eiaData.renewable}%</StatNumber></Stat>
-                          <Stat><StatLabel color="brand.dark" fontSize="sm">Grid Capacity (GW)</StatLabel><StatNumber color="brand.accent">{eiaData.capacity}</StatNumber></Stat>
+                          <Stat><StatLabel color="rgba(255,255,255,0.55)" fontSize="sm">Actual Renewable %</StatLabel><StatNumber color="#FF6B2B">{eiaData.renewable}%</StatNumber></Stat>
+                          <Stat><StatLabel color="rgba(255,255,255,0.55)" fontSize="sm">Grid Capacity (GW)</StatLabel><StatNumber color="#FF6B2B">{eiaData.capacity}</StatNumber></Stat>
                         </SimpleGrid>
                         <Box w="full" h="200px">
                           <ResponsiveContainer width="100%" height="100%">
                             <BarChart data={[{ name: 'Claimed', value: claim?.claimedRenewable ?? 100 }, { name: 'Actual (EIA)', value: eiaData.renewable }]} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-                              <CartesianGrid strokeDasharray="3 3" stroke="#BFC9D1" />
-                              <XAxis dataKey="name" tick={{ fill: '#25343F', fontSize: 12 }} />
-                              <YAxis domain={[0, 100]} unit="%" tick={{ fill: '#25343F', fontSize: 12 }} />
-                              <Tooltip formatter={(v) => `${v}%`} />
+                              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
+                              <XAxis dataKey="name" tick={{ fill: 'rgba(255,255,255,0.6)', fontSize: 12 }} />
+                              <YAxis domain={[0, 100]} unit="%" tick={{ fill: 'rgba(255,255,255,0.6)', fontSize: 12 }} />
+                              <Tooltip contentStyle={{ background: '#0D1829', border: '1px solid rgba(255,107,43,0.3)', borderRadius: 8 }} formatter={(v) => `${v}%`} />
                               <Bar dataKey="value" radius={[6, 6, 0, 0]} maxBarSize={60}>
                                 <Cell fill="#FF9B51" />
                                 <Cell fill={eiaData.renewable >= (claim?.claimedRenewable ?? 80) ? '#48BB78' : '#FC8181'} />
@@ -251,77 +271,81 @@ export default function AuditFlowPage() {
                             </BarChart>
                           </ResponsiveContainer>
                         </Box>
-                        <Text fontSize="xs" color="brand.dark" opacity={0.5}>Source: {eiaData.source} • State: {eiaData.state}</Text>
+                        <Text fontSize="xs" color="rgba(255,255,255,0.35)">Source: {eiaData.source} • State: {eiaData.state}</Text>
                       </VStack>
-                    ) : <VStack spacing={3}><Progress size="xs" isIndeterminate colorScheme="orange" w="full" /><Text color="brand.dark" opacity={0.5} fontSize="sm">Fetching EIA data...</Text></VStack>}
+                    ) : <VStack spacing={3}><Progress size="xs" isIndeterminate colorScheme="orange" w="full" sx={{ '& > div': { bg: 'linear-gradient(to right,#FF6B2B,#FBBF24)' } }} /><Text color="rgba(255,255,255,0.4)" fontSize="sm">Fetching EIA data...</Text></VStack>}
                   </CardBody>
                 </Card>
               </TabPanel>
 
               {/* EPA Tab */}
               <TabPanel>
-                <Card bg="white">
+                <Card className="glass" border="1px solid rgba(255,107,43,0.15)">
                   <CardBody>
                     {epaData ? (
                       <VStack align="start" spacing={4}>
-                        <Text color="brand.dark" fontWeight={700} fontSize="md">EPA Emissions — CO₂ vs Benchmarks</Text>
+                        <Text color="white" fontWeight={700} fontSize="md">EPA Emissions — CO₂ vs Benchmarks</Text>
                         <SimpleGrid columns={2} spacing={4} w="full">
-                          <Stat><StatLabel color="brand.dark" fontSize="sm">CO₂ Intensity</StatLabel><StatNumber color="brand.accent">{epaData.co2}</StatNumber><Text fontSize="xs" opacity={0.5}>{epaData.unit}</Text></Stat>
-                          <Stat><StatLabel color="brand.dark" fontSize="sm">Data Year</StatLabel><StatNumber color="brand.accent">{epaData.year}</StatNumber></Stat>
+                          <Stat><StatLabel color="rgba(255,255,255,0.55)" fontSize="sm">CO₂ Intensity</StatLabel><StatNumber color="#FF6B2B">{epaData.co2}</StatNumber><Text fontSize="xs" opacity={0.5} color="white">{epaData.unit}</Text></Stat>
+                          <Stat><StatLabel color="rgba(255,255,255,0.55)" fontSize="sm">Data Year</StatLabel><StatNumber color="#FF6B2B">{epaData.year}</StatNumber></Stat>
                         </SimpleGrid>
                         <Box w="full" h="200px">
                           <ResponsiveContainer width="100%" height="100%">
                             <BarChart data={[{ name: 'Actual CO₂', value: epaData.co2 }, { name: 'US Avg', value: 450 }, { name: 'Clean Grid', value: 50 }]} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-                              <CartesianGrid strokeDasharray="3 3" stroke="#BFC9D1" />
-                              <XAxis dataKey="name" tick={{ fill: '#25343F', fontSize: 12 }} />
-                              <YAxis unit=" lb" tick={{ fill: '#25343F', fontSize: 12 }} />
-                              <Tooltip formatter={(v) => `${v} lbs/MWh`} />
+                              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
+                              <XAxis dataKey="name" tick={{ fill: 'rgba(255,255,255,0.6)', fontSize: 12 }} />
+                              <YAxis unit=" lb" tick={{ fill: 'rgba(255,255,255,0.6)', fontSize: 12 }} />
+                              <Tooltip contentStyle={{ background: '#0D1829', border: '1px solid rgba(255,107,43,0.3)', borderRadius: 8 }} formatter={(v) => `${v} lbs/MWh`} />
                               <Bar dataKey="value" radius={[6, 6, 0, 0]} maxBarSize={60}>
-                                <Cell fill={epaData.co2 > 450 ? '#FC8181' : epaData.co2 < 100 ? '#48BB78' : '#FF9B51'} />
-                                <Cell fill="#BFC9D1" /><Cell fill="#48BB78" />
+                                <Cell fill={epaData.co2 > 450 ? '#EF4444' : epaData.co2 < 100 ? '#22C55E' : '#FF6B2B'} />
+                                <Cell fill="rgba(255,255,255,0.2)" /><Cell fill="#22C55E" />
                               </Bar>
                             </BarChart>
                           </ResponsiveContainer>
                         </Box>
-                        <Text fontSize="xs" color="brand.dark" opacity={0.5}>Source: {epaData.source}</Text>
+                        <Text fontSize="xs" color="rgba(255,255,255,0.35)">Source: {epaData.source}</Text>
                       </VStack>
-                    ) : <VStack spacing={3}><Progress size="xs" isIndeterminate colorScheme="orange" w="full" /><Text color="brand.dark" opacity={0.5} fontSize="sm">Fetching EPA data...</Text></VStack>}
+                    ) : <VStack spacing={3}><Progress size="xs" isIndeterminate colorScheme="orange" w="full" /><Text color="rgba(255,255,255,0.4)" fontSize="sm">Fetching EPA data...</Text></VStack>}
                   </CardBody>
                 </Card>
               </TabPanel>
 
               {/* SEC EDGAR Tab */}
               <TabPanel>
-                <Card bg="white">
+                <Card className="glass" border="1px solid rgba(255,107,43,0.15)">
                   <CardBody>
                     {secData ? (
                       <VStack align="start" spacing={4}>
                         <HStack justify="space-between" w="full">
-                          <Text color="brand.dark" fontWeight={700} fontSize="md">SEC EDGAR Filings</Text>
-                          <Badge colorScheme={secData.disclosureRisk === 'HIGH' ? 'red' : 'yellow'}>
+                          <Text color="white" fontWeight={700} fontSize="md">SEC EDGAR Filings</Text>
+                          <Badge
+                            bg={secData.disclosureRisk === 'HIGH' ? 'rgba(239,68,68,0.15)' : 'rgba(251,191,36,0.15)'}
+                            color={secData.disclosureRisk === 'HIGH' ? '#EF4444' : '#FBBF24'}
+                            fontSize="xs" borderRadius="full" px={3}>
                             Disclosure Risk: {secData.disclosureRisk}
                           </Badge>
                         </HStack>
-                        <Text color="brand.dark" fontSize="sm">{secData.esgStatement}</Text>
+                        <Text color="rgba(255,255,255,0.6)" fontSize="sm">{secData.esgStatement}</Text>
                         {secData.esgClaims?.length > 0 && (
                           <List spacing={2} w="full">
                             {secData.esgClaims.map((c, i) => (
-                              <ListItem key={i} fontSize="sm" color="brand.dark">
-                                <ListIcon as={c.formType === '10-K' ? CheckCircleIcon : WarningIcon} color="brand.accent" />
+                              <ListItem key={i} fontSize="sm" color="rgba(255,255,255,0.7)">
+                                <ListIcon as={c.formType === '10-K' ? CheckCircleIcon : WarningIcon} color="#FF6B2B" />
                                 {c.excerpt}
                               </ListItem>
                             ))}
                           </List>
                         )}
-                        <Text fontSize="xs" color="brand.dark" opacity={0.5}>Source: {secData.dataSource}</Text>
-                        <Text as="a" href={secData.edgarUrl} target="_blank" fontSize="xs" color="brand.accent" textDecoration="underline">
+                        <Text fontSize="xs" color="rgba(255,255,255,0.3)">Source: {secData.dataSource}</Text>
+                        <Text as="a" href={secData.edgarUrl} target="_blank" rel="noopener noreferrer"
+                          fontSize="xs" color="#22D3EE" textDecoration="underline">
                           View on SEC EDGAR →
                         </Text>
                       </VStack>
                     ) : (
                       <VStack spacing={3}>
                         <Progress size="xs" isIndeterminate colorScheme="orange" w="full" />
-                        <Text color="brand.dark" opacity={0.5} fontSize="sm">Searching SEC EDGAR filings...</Text>
+                        <Text color="rgba(255,255,255,0.4)" fontSize="sm">Searching SEC EDGAR filings...</Text>
                       </VStack>
                     )}
                   </CardBody>
@@ -330,6 +354,7 @@ export default function AuditFlowPage() {
             </TabPanels>
           </Tabs>
         </VStack>
+        </motion.div>
       </Container>
     </Box>
   )
