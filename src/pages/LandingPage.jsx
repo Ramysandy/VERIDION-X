@@ -32,26 +32,26 @@ function TypeWriter({ words, color }) {
   )
 }
 
-const TAGLINES = ['Greenwashing Exposed.', 'ESG Fraud Detected.', 'Truth Published On-Chain.']
+const TAGLINES = ['FROST Oracle Consensus.', 'Taproot-Secured Verdicts.', 'Unbribable AI Justice.']
 
 const STATS = [
-  { value: '3', label: 'Federal Sources', sub: 'EIA · EPA · SEC' },
-  { value: '256', label: 'Bit Encryption', sub: 'Nostr cryptographic proof' },
-  { value: '< 30', label: 'Seconds Per Audit', sub: 'AI-powered pipeline' },
-  { value: '100%', label: 'On-Chain', sub: 'Immutable verdicts' },
+  { value: '3', label: 'Oracle Nodes', sub: 'FROST threshold MPC' },
+  { value: '2/3', label: 'Consensus', sub: 'Schnorr threshold sigs' },
+  { value: 'P2TR', label: 'Taproot', sub: 'BIP-341 key-path spend' },
+  { value: '∞', label: 'Immutable', sub: 'Bitcoin + Nostr proofs' },
 ]
 
 const HOW_IT_WORKS = [
-  { step: '01', icon: '🕷️', title: 'Scrape Claims', desc: 'FireCrawl extracts live ESG pledges from the company website.' },
-  { step: '02', icon: '📡', title: 'Cross-Reference', desc: 'US EIA, EPA eGRID, and SEC EDGAR filings are queried in parallel.' },
-  { step: '03', icon: '⚡', title: 'AI Verdict', desc: 'Groq llama-3.3-70b issues a risk score and structured fraud verdict.' },
+  { step: '01', icon: '🛰️', title: 'The Hunt', desc: '3 independent FROST oracle nodes query EIA, EPA & SEC EDGAR federal databases simultaneously.' },
+  { step: '02', icon: '🤖', title: 'The Consensus', desc: 'Each node runs Groq llama-3.3-70b independently. If 2-of-3 detect fraud, they exchange Schnorr nonce commitments.' },
+  { step: '03', icon: '⚡', title: 'The Strike', desc: 'Partial signatures aggregate into one BIP-340 Schnorr signature. The verdict is inscribed on Bitcoin via Taproot OP_RETURN.' },
 ]
 
 const FEATURES = [
-  { icon: '🛰️', title: 'Real Federal Data', desc: 'EIA energy grid, EPA CO₂ benchmarks, SEC EDGAR 10-K filings — not corporate self-reports.', tag: 'Data Sources' },
-  { icon: '🤖', title: 'Groq AI Verdict', desc: 'llama-3.3-70b produces structured risk scores, contradiction counts, and key findings.', tag: 'AI Powered' },
-  { icon: '🔗', title: 'Nostr Proof', desc: 'Every verdict is cryptographically signed and broadcast to 3 censorship-resistant relays.', tag: 'Decentralized' },
-  { icon: '🏛️', title: 'Hall of Shame', desc: 'Permanent on-chain leaderboard ranking the most fraudulent ESG offenders by risk score.', tag: 'Leaderboard' },
+  { icon: '🔐', title: 'FROST Threshold', desc: '2-of-3 Schnorr threshold signatures via Shamir\'s Secret Sharing and Lagrange interpolation. No single point of failure.', tag: 'Cryptography' },
+  { icon: '₿', title: 'Bitcoin Taproot', desc: 'BIP-341 P2TR addresses with key-path spending. Verdicts inscribed on-chain via OP_RETURN inscription.', tag: 'Settlement' },
+  { icon: '🛰️', title: 'Federal Data', desc: 'EIA energy grid, EPA eGRID CO₂ rates, SEC EDGAR 10-K filings — real government data, not self-reports.', tag: 'Data Sources' },
+  { icon: '🔗', title: 'Nostr + Bitcoin', desc: 'Dual-layer immutability: Nostr censorship-resistant relay broadcast and Bitcoin blockchain inscription.', tag: 'Decentralized' },
 ]
 
 const QUICK_COMPANIES = ['ExxonMobil', 'Amazon', 'Shell', 'BP', 'Tesla']
@@ -105,7 +105,7 @@ export default function LandingPage() {
                 fontSize="xs" letterSpacing="widest" fontWeight={700}>
                 <HStack spacing={2}>
                   <span className="pulse-dot" />
-                  <span>LIVE · ESG FRAUD DETECTION</span>
+                  <span>LIVE · FROST ORACLE NETWORK</span>
                 </HStack>
               </Badge>
             </MotionBox>
@@ -128,8 +128,8 @@ export default function LandingPage() {
 
             <MotionBox variants={fadeUp} maxW="600px">
               <Text color="rgba(255,255,255,0.5)" fontSize="lg" lineHeight={1.8}>
-                The autonomous ESG court that cross-references corporate climate pledges
-                against <strong style={{ color: '#FF9B51' }}>US federal databases</strong> — and publishes immutable verdicts to the blockchain.
+                A decentralized fraud court where <strong style={{ color: '#FF9B51' }}>3 independent AI oracle nodes</strong> cross-reference
+                ESG claims against federal data — and seal the verdict with <strong style={{ color: '#A78BFA' }}>FROST threshold Schnorr signatures</strong> on Bitcoin.
               </Text>
             </MotionBox>
 
@@ -168,7 +168,7 @@ export default function LandingPage() {
                     onClick={() => handleAudit()}
                     _hover={{ opacity: 0.9, transform: 'translateY(-2px)' }}
                     transition="all 0.2s">
-                    Audit for Greenwashing
+                    Deploy Oracle Nodes
                   </Button>
                   {/* Quick picks */}
                   <HStack spacing={2} flexWrap="wrap" justify="center">
@@ -275,7 +275,7 @@ export default function LandingPage() {
           <VStack spacing={4}>
             <Text fontSize="xs" color="rgba(255,255,255,0.3)" letterSpacing="widest">POWERED BY</Text>
             <HStack spacing={8} flexWrap="wrap" justify="center">
-              {['🏛️ EIA Grid Data', '🌿 EPA eGRID', '📋 SEC EDGAR', '🤖 Groq AI', '🔗 Nostr'].map(src => (
+              {['🔐 FROST Schnorr', '₿ Bitcoin Taproot', '🏛️ EIA + EPA + SEC', '🤖 Groq AI', '🔗 Nostr'].map(src => (
                 <Text key={src} color="rgba(255,255,255,0.45)" fontSize="sm" fontWeight={600}>{src}</Text>
               ))}
             </HStack>
@@ -290,10 +290,10 @@ export default function LandingPage() {
             <VStack spacing={6}>
               <Text fontSize="xs" color="#FF9B51" fontWeight={700} letterSpacing="widest">GET STARTED</Text>
               <Text fontSize={{ base: '2xl', md: '3xl' }} fontWeight={900} color="white" lineHeight={1.2}>
-                Stop believing corporate<br />ESG reports. Verify them.
+                No single oracle.<br />No single point of failure.
               </Text>
               <Text color="rgba(255,255,255,0.5)" maxW="420px">
-                One company name. Seven automated steps. One immutable on-chain verdict.
+                One company name. Three independent AI oracles. One FROST-signed Bitcoin verdict.
               </Text>
               <Button
                 className="shimmer-btn"

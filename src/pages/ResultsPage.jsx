@@ -53,6 +53,11 @@ export default function ResultsPage() {
   const secData = useAuditStore((s) => s.secData)
   const payments = useAuditStore((s) => s.payments)
   const resetAudit = useAuditStore((s) => s.resetAudit)
+  const oracleResults = useAuditStore((s) => s.oracleResults)
+  const frostSignature = useAuditStore((s) => s.frostSignature)
+  const bitcoinTx = useAuditStore((s) => s.bitcoinTx)
+  const taprootAddress = useAuditStore((s) => s.taprootAddress)
+  const groupPubKey = useAuditStore((s) => s.groupPubKey)
 
   const totalCost = payments.reduce((sum, p) => sum + p.sats, 0)
   const riskScore = verdict?.riskScore ?? 50
@@ -272,6 +277,106 @@ export default function ResultsPage() {
                         <Text as="a" href={secData.edgarUrl} target="_blank" rel="noopener noreferrer"
                           fontSize="xs" color="#5B7FFF" _hover={{ textDecoration: 'underline' }}>
                           View on SEC EDGAR <ExternalLinkIcon mx={1} boxSize={3} />
+                        </Text>
+                      )}
+                    </VStack>
+                  </CardBody>
+                </MotionCard>
+              )}
+
+              {/* FROST Oracle Consensus */}
+              {oracleResults?.consensus && (
+                <MotionCard variants={fadeUp} className="glass" borderLeft="4px solid #A78BFA">
+                  <CardBody>
+                    <VStack align="start" spacing={4}>
+                      <HStack justify="space-between" w="full" flexWrap="wrap">
+                        <Heading as="h3" size="sm" color="white" fontFamily="heading">FROST Oracle Consensus</Heading>
+                        <Badge
+                          bg={oracleResults.consensus.fraudDetected ? 'rgba(239,68,68,0.15)' : 'rgba(34,197,94,0.15)'}
+                          color={oracleResults.consensus.fraudDetected ? '#EF4444' : '#22C55E'}
+                          fontSize="xs" borderRadius="full" px={3}>
+                          {oracleResults.consensus.fraudVotes}/3 — {oracleResults.consensus.fraudDetected ? 'FRAUD CONSENSUS' : 'CLEAN'}
+                        </Badge>
+                      </HStack>
+                      <SimpleGrid columns={3} spacing={3} w="full">
+                        {oracleResults.nodes?.map(n => (
+                          <Box key={n.id} p={3} bg="rgba(0,0,0,0.3)" borderRadius="lg" border="1px solid rgba(255,255,255,0.06)" textAlign="center">
+                            <Text fontSize="2xs" color="rgba(255,255,255,0.4)">Oracle Node {n.id}</Text>
+                            <Text fontSize="xl" fontWeight={800} color={n.fraud ? '#EF4444' : '#22C55E'}>{n.risk}</Text>
+                            <Badge bg={n.fraud ? 'rgba(239,68,68,0.15)' : 'rgba(34,197,94,0.15)'} color={n.fraud ? '#EF4444' : '#22C55E'} fontSize="2xs" borderRadius="full">{n.level}</Badge>
+                          </Box>
+                        ))}
+                      </SimpleGrid>
+                      <Text fontSize="xs" color="rgba(255,255,255,0.4)">
+                        Scheme: FROST 2-of-3 Schnorr Threshold · Shamir's Secret Sharing + Lagrange Interpolation
+                      </Text>
+                    </VStack>
+                  </CardBody>
+                </MotionCard>
+              )}
+
+              {/* Bitcoin Taproot Proof */}
+              {(frostSignature || bitcoinTx) && (
+                <MotionCard variants={fadeUp} className="glass" borderTop="3px solid #FF6B2B" borderLeft="4px solid #FBBF24">
+                  <CardBody>
+                    <VStack align="start" spacing={4}>
+                      <Heading as="h3" size="md" color="white" fontFamily="heading">
+                        Bitcoin Taproot Proof
+                      </Heading>
+
+                      {frostSignature && (
+                        <Box w="full">
+                          <Text fontSize="xs" color="#A78BFA" fontWeight={700} mb={2}>FROST Schnorr Signature (BIP-340)</Text>
+                          <SimpleGrid columns={{ base: 1, md: 2 }} spacing={2}>
+                            <Box p={2} bg="rgba(0,0,0,0.3)" borderRadius="md" border="1px solid rgba(167,139,250,0.15)">
+                              <Text fontSize="2xs" color="rgba(255,255,255,0.4)">R (Nonce Point)</Text>
+                              <Text fontSize="2xs" fontFamily="mono" color="rgba(255,255,255,0.7)" wordBreak="break-all">{frostSignature.R}</Text>
+                            </Box>
+                            <Box p={2} bg="rgba(0,0,0,0.3)" borderRadius="md" border="1px solid rgba(167,139,250,0.15)">
+                              <Text fontSize="2xs" color="rgba(255,255,255,0.4)">s (Aggregated Scalar)</Text>
+                              <Text fontSize="2xs" fontFamily="mono" color="rgba(255,255,255,0.7)" wordBreak="break-all">{frostSignature.s}</Text>
+                            </Box>
+                          </SimpleGrid>
+                          {frostSignature.valid && (
+                            <Badge bg="rgba(34,197,94,0.15)" color="#22C55E" fontSize="2xs" borderRadius="full" px={2} mt={2}>
+                              Signature Valid ✓
+                            </Badge>
+                          )}
+                        </Box>
+                      )}
+
+                      {bitcoinTx && (
+                        <Box w="full">
+                          <Text fontSize="xs" color="#FF9B51" fontWeight={700} mb={2}>Taproot Transaction (BIP-341)</Text>
+                          <SimpleGrid columns={{ base: 1, md: 2 }} spacing={2}>
+                            <Box>
+                              <Text fontSize="2xs" color="rgba(255,255,255,0.4)">TxID</Text>
+                              <Text fontSize="2xs" fontFamily="mono" color="#FF9B51" wordBreak="break-all">{bitcoinTx.txId}</Text>
+                            </Box>
+                            <Box>
+                              <Text fontSize="2xs" color="rgba(255,255,255,0.4)">OP_RETURN Inscription</Text>
+                              <Text fontSize="2xs" fontFamily="mono" color="rgba(255,255,255,0.7)">{bitcoinTx.opReturn}</Text>
+                            </Box>
+                          </SimpleGrid>
+                          <HStack mt={2} spacing={3}>
+                            {taprootAddress?.testnet && (
+                              <Text fontSize="2xs" color="rgba(255,255,255,0.4)">
+                                P2TR: <Text as="span" fontFamily="mono" color="rgba(255,255,255,0.6)">{taprootAddress.testnet.slice(0, 20)}...</Text>
+                              </Text>
+                            )}
+                            {bitcoinTx.mempoolUrl && (
+                              <Text as="a" href={bitcoinTx.mempoolUrl} target="_blank" rel="noopener noreferrer"
+                                fontSize="2xs" color="#5B7FFF" _hover={{ textDecoration: 'underline' }}>
+                                View on mempool.space <ExternalLinkIcon mx={1} boxSize={3} />
+                              </Text>
+                            )}
+                          </HStack>
+                        </Box>
+                      )}
+
+                      {groupPubKey && (
+                        <Text fontSize="2xs" color="rgba(255,255,255,0.3)">
+                          FROST Group Key: {groupPubKey.slice(0, 24)}... · BIP-340 x-only
                         </Text>
                       )}
                     </VStack>

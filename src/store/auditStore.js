@@ -15,6 +15,13 @@ const useAuditStore = create((set, get) => ({
   nostrNoteId: '',
   error: null,
 
+  // FROST Oracle state
+  oracleResults: null,    // { nodes, consensus, signature, transaction }
+  frostSignature: null,   // { R, s, valid, participatingNodes }
+  bitcoinTx: null,        // { txId, rawHex, mempoolUrl, opReturn }
+  taprootAddress: null,   // { testnet, mainnet, outputKey }
+  groupPubKey: null,      // x-only FROST aggregate pubkey
+
   // Claim kicks off the audit pipeline
   setClaim: (claim) => set({
     claim,
@@ -37,6 +44,11 @@ const useAuditStore = create((set, get) => ({
     nostrNoteId: '',
     payments: [],
     error: null,
+    oracleResults: null,
+    frostSignature: null,
+    bitcoinTx: null,
+    taprootAddress: null,
+    groupPubKey: null,
   }),
 
   // Update claim data mid-pipeline without resetting phase
@@ -68,6 +80,13 @@ const useAuditStore = create((set, get) => ({
     payments: [...state.payments, { sats, source, timestamp: new Date() }],
     walletBalance: state.walletBalance - sats,
   })),
+
+  // FROST Oracle setters
+  setOracleResults: (oracleResults) => set({ oracleResults }),
+  setFrostSignature: (frostSignature) => set({ frostSignature }),
+  setBitcoinTx: (bitcoinTx) => set({ bitcoinTx }),
+  setTaprootAddress: (taprootAddress) => set({ taprootAddress }),
+  setGroupPubKey: (groupPubKey) => set({ groupPubKey }),
 
   resetAudit: () => set({
     claim: null,

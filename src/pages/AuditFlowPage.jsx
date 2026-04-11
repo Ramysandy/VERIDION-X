@@ -1,394 +1,355 @@
 import {
-  Container,
-  VStack,
-  HStack,
-  Heading,
-  Text,
-  Card,
-  CardBody,
-  Progress,
-  Badge,
-  Box,
-  Tabs,
-  TabList,
-  TabPanels,
-  Tab,
-  TabPanel,
-  SimpleGrid,
-  Stat,
-  StatLabel,
-  StatNumber,
-  Alert,
-  AlertIcon,
-  AlertDescription,
-  List,
-  ListItem,
-  ListIcon,
+  Container, VStack, HStack, Heading, Text, Card, CardBody,
+  Badge, Box, SimpleGrid, Divider,
 } from '@chakra-ui/react'
-import { WarningIcon, CheckCircleIcon } from '@chakra-ui/icons'
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, Cell, ReferenceLine,
-} from 'recharts'
 import { useEffect, useState, useRef } from 'react'
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { useAuditStore } from '../store/auditStore'
-import { eiaAPI, epaAPI, groqAPI, nostrAPI, secAPI } from '../api/client'
+import OracleTerminal from '../components/OracleTerminal'
 
 const MotionBox = motion(Box)
-
-const phases = [
-  'IDLE', 'EXTRACTING_CLAIM', 'FETCHING_EIA', 'LOADING_EPA',
-  'CHECKING_SEC', 'SCORING', 'WRITING_NARRATIVE', 'COMPLETE',
-]
-const phaseLabels = {
-  IDLE: 'Ready',
-  EXTRACTING_CLAIM: 'Parsing ESG Claim...',
-  FETCHING_EIA: 'Fetching EIA Grid Data',
-  LOADING_EPA: 'Loading EPA Emissions',
-  CHECKING_SEC: 'Checking SEC EDGAR Filings',
-  SCORING: 'AI Analyzing Contradictions...',
-  WRITING_NARRATIVE: 'Publishing to Blockchain',
-  COMPLETE: 'Audit Complete ✓',
-  ERROR: 'Error',
-}
 
 export default function AuditFlowPage() {
   const navigate = useNavigate()
   const hasStarted = useRef(false)
 
   const targetCompany = useAuditStore((s) => s.targetCompany)
-  const claim = useAuditStore((s) => s.claim)
-  const auditPhase = useAuditStore((s) => s.auditPhase)
-  const eiaData = useAuditStore((s) => s.eiaData)
-  const epaData = useAuditStore((s) => s.epaData)
-  const secData = useAuditStore((s) => s.secData)
-  const error = useAuditStore((s) => s.error)
-  const setClaimData = useAuditStore((s) => s.setClaimData)
-  const setEiaData = useAuditStore((s) => s.setEiaData)
-  const setEpaData = useAuditStore((s) => s.setEpaData)
-  const setSecData = useAuditStore((s) => s.setSecData)
   const setVerdict = useAuditStore((s) => s.setVerdict)
   const setNarrative = useAuditStore((s) => s.setNarrative)
   const setNostrNoteId = useAuditStore((s) => s.setNostrNoteId)
-  const setAuditPhase = useAuditStore((s) => s.setAuditPhase)
-  const addPayment = useAuditStore((s) => s.addPayment)
+  const setEiaData = useAuditStore((s) => s.setEiaData)
+  const setEpaData = useAuditStore((s) => s.setEpaData)
+  const setSecData = useAuditStore((s) => s.setSecData)
+  const setClaimData = useAuditStore((s) => s.setClaimData)
+  const setOracleResults = useAuditStore((s) => s.setOracleResults)
+  const setFrostSignature = useAuditStore((s) => s.setFrostSignature)
+  const setBitcoinTx = useAuditStore((s) => s.setBitcoinTx)
+  const setTaprootAddress = useAuditStore((s) => s.setTaprootAddress)
+  const setGroupPubKey = useAuditStore((s) => s.setGroupPubKey)
   const setError = useAuditStore((s) => s.setError)
 
-  const [progress, setProgress] = useState(0)
-
-  useEffect(() => {
-    if (auditPhase === 'COMPLETE') setTimeout(() => navigate('/results'), 800)
-  }, [auditPhase, navigate])
-
-  useEffect(() => {
-    if (auditPhase === 'ERROR') { setProgress(0); return }
-    const idx = phases.indexOf(auditPhase)
-    setProgress(idx < 0 ? 0 : Math.round((idx / (phases.length - 1)) * 100))
-  }, [auditPhase])
+  const [nodeLogs, setNodeLogs] = useState({ 1: [], 2: [], 3: [] })
+  const [nodeStatus, setNodeStatus] = useState({ 1: 'waiting', 2: 'waiting', 3: 'waiting' })
+  const [oracleInit, setOracleInit] = useState(null)
+  const [consensus, setConsensus] = useState(null)
+  const [signature, setSignature] = useState(null)
+  const [transaction, setTransaction] = useState(null)
+  const [phase, setPhase] = useState('CONNECTING') // CONNECTING, RUNNING, CONSENSUS, SIGNING, COMPLETE, ERROR
 
   useEffect(() => {
     if (!targetCompany || hasStarted.current) return
-    const runAudit = async () => {
-      hasStarted.current = true
-      const company = targetCompany
-      const state = 'CA'
+    hasStarted.current = true
+
+    setClaimData({ company: targetCompany, claim: `${targetCompany}'s commitment to 100% renewable energy and carbon neutrality` })
+
+    const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+    const source = new EventSource(`${apiBase}/api/oracle/stream?company=${encodeURIComponent(targetCompany)}`)
+
+    source.addEventListener('init', (e) => {
+      const data = JSON.parse(e.data)
+      setOracleInit(data)
+      setTaprootAddress(data.taproot)
+      setGroupPubKey(data.groupPubKey)
+      setPhase('RUNNING')
+      setNodeStatus({ 1: 'running', 2: 'running', 3: 'running' })
+    })
+
+    source.addEventListener('node-log', (e) => {
+      const data = JSON.parse(e.data)
+      setNodeLogs(prev => ({
+        ...prev,
+        [data.nodeId]: [...(prev[data.nodeId] || []), data]
+      }))
+      // Mark node running if first log
+      setNodeStatus(prev => prev[data.nodeId] === 'waiting' ? { ...prev, [data.nodeId]: 'running' } : prev)
+    })
+
+    source.addEventListener('consensus', (e) => {
+      const data = JSON.parse(e.data)
+      setConsensus(data)
+      setPhase('CONSENSUS')
+      // Mark all nodes done
+      setNodeStatus({ 1: 'done', 2: 'done', 3: 'done' })
+    })
+
+    source.addEventListener('nonce', (e) => {
+      const data = JSON.parse(e.data)
+      setNodeLogs(prev => ({
+        ...prev,
+        [data.nodeId]: [...(prev[data.nodeId] || []), { type: 'crypto', message: `Nonce commitment R = ${data.R.slice(0, 24)}...`, ts: Date.now() }]
+      }))
+    })
+
+    source.addEventListener('signature', (e) => {
+      const data = JSON.parse(e.data)
+      setSignature(data)
+      setFrostSignature(data)
+      setPhase('SIGNING')
+    })
+
+    source.addEventListener('transaction', (e) => {
+      const data = JSON.parse(e.data)
+      setTransaction(data)
+      setBitcoinTx(data)
+    })
+
+    source.addEventListener('complete', (e) => {
+      const data = JSON.parse(e.data)
+      source.close()
+      setPhase('COMPLETE')
+
+      // Populate store for ResultsPage
+      const v = data.verdict || {}
+      setVerdict({
+        winner: !v.fraudDetected,
+        contradictions: v.reasons?.length ?? 1,
+        confidence: v.confidence ?? 80,
+        riskScore: v.riskScore ?? 50,
+        riskLevel: v.riskLevel ?? 'MEDIUM',
+        claimedRenewable: 100,
+        actualRenewable: data.eiaData?.renewablePercentage ?? 0,
+        co2Intensity: data.epaData?.co2Intensity ?? 0,
+        reasons: v.reasons || [],
+        aiVerdict: v.verdict || 'ANALYZED',
+      })
+      setNarrative(v.narrative || '')
+      if (data.eiaData) setEiaData({ renewable: data.eiaData.renewablePercentage, capacity: Math.round((data.eiaData.totalCapacity || 250000) / 1000), state: data.eiaData.state, source: data.eiaData.dataSource })
+      if (data.epaData) setEpaData({ co2: data.epaData.co2Intensity, year: 2024, unit: data.epaData.unit, source: data.epaData.dataSource })
+      if (data.secData) setSecData(data.secData)
+
+      setOracleResults({
+        nodes: data.consensus?.nodeVotes || [],
+        consensus: data.consensus,
+        signature: data.signature,
+        transaction: data.transaction,
+      })
+
+      // Save leaderboard + nostr fallback ID
+      const noteId = `note1frost${Math.random().toString(36).slice(2, 18)}`
+      setNostrNoteId(noteId)
+      const entry = { company: targetCompany, verdict: { riskScore: v.riskScore, riskLevel: v.riskLevel, winner: !v.fraudDetected, reasons: v.reasons }, narrative: v.narrative, nostrNoteId: noteId, timestamp: new Date().toISOString(), claim: `${targetCompany} ESG claims` }
+      const existing = JSON.parse(localStorage.getItem('veridion_leaderboard') || '[]')
+      const updated = [entry, ...existing.filter(x => x.company !== targetCompany)].slice(0, 20)
+      localStorage.setItem('veridion_leaderboard', JSON.stringify(updated))
+
+      setTimeout(() => navigate('/results'), 1800)
+    })
+
+    source.addEventListener('error', (e) => {
+      // SSE connection error
+      if (source.readyState === EventSource.CLOSED) return
       try {
-        // Step 0: Generate ESG claim via Groq (no scraping needed — fast)
-        setAuditPhase('EXTRACTING_CLAIM')
-        let claimText = `${company}'s commitment to 100% renewable energy and carbon neutrality`
-        let claimedRenewable = 100
-        try {
-          const extracted = await groqAPI.extractClaim(
-            `${company} sustainability ESG renewable energy carbon neutral claims`,
-            company
-          )
-          if (extracted?.extractedClaim) {
-            claimText = extracted.extractedClaim
-          }
-        } catch { /* non-fatal: use fallback claim */ }
-        const claimObj = { company, claim: claimText, claimedRenewable, state }
-        setClaimData(claimObj)
+        const data = JSON.parse(e.data)
+        setError(data.message)
+      } catch { /* SSE reconnect attempt */ }
+    })
 
-        // Steps 1-3: EIA, EPA, SEC in parallel (SEC capped at 3s — non-critical)
-        const secRace = Promise.race([
-          secAPI.getFilings(company),
-          new Promise((_, rej) => setTimeout(() => rej(new Error('SEC timeout')), 3000))
-        ]).catch(() => null)
-
-        const [eia, epa] = await Promise.all([
-          eiaAPI.getRenewableCapacity(state, company),
-          epaAPI.getEmissions(state, company),
-        ])
-        addPayment(100, 'EIA')
-        setEiaData({ renewable: eia.renewablePercentage, capacity: Math.round((eia.totalCapacity || 250000) / 1000), state: eia.state, source: eia.dataSource, totalCapacity: eia.totalCapacity })
-
-        addPayment(100, 'EPA')
-        setEpaData({ co2: epa.co2Intensity, year: epa.details?.year || 2024, unit: epa.unit, source: epa.dataSource })
-
-        setAuditPhase('CHECKING_SEC')
-        const sec = await secRace
-        if (sec) setSecData(sec)
-
-        // Step 4: AI verdict via Groq — pass full data for company-specific analysis
-        setAuditPhase('SCORING')
-        const groq = await groqAPI.analyzeClaim(company, claimText,
-          { renewablePercentage: eia.renewablePercentage, totalCapacity: eia.totalCapacity, fossilPercentage: eia.fossilPercentage, year: eia.year, details: eia.details },
-          { co2Intensity: epa.co2Intensity, stateBaseline: epa.stateBaseline, nationalAverage: epa.nationalAverage, sectorMultiplier: epa.sectorMultiplier },
-          sec
-        )
-        addPayment(50, 'Groq AI')
-
-        const ai = groq.aiVerdict || {}
-        const verdict = {
-          winner: !ai.greenwashing,
-          contradictions: ai.contradictions ?? 1,
-          confidence: ai.confidence ?? 88,
-          riskScore: ai.riskScore ?? 50,
-          riskLevel: ai.riskLevel ?? 'MEDIUM',
-          claimedRenewable: claimedRenewable,
-          actualRenewable: eia.renewablePercentage,
-          co2Intensity: epa.co2Intensity,
-          reasons: ai.reasons || [],
-          aiVerdict: ai.verdict || 'ANALYZED',
-        }
-        setVerdict(verdict)
-        setNarrative(groq.narrative)
-
-        // Step 5: Save leaderboard & navigate IMMEDIATELY, run Nostr in background
-        const fallbackNoteId = `note1pending${Math.random().toString(36).slice(2, 18)}`
-        const entry = { company, verdict, narrative: groq.narrative, nostrNoteId: fallbackNoteId, timestamp: new Date().toISOString(), claim: claimText }
-        const existing = JSON.parse(localStorage.getItem('veridion_leaderboard') || '[]')
-        const updated = [entry, ...existing.filter(e => e.company !== company)].slice(0, 20)
-        localStorage.setItem('veridion_leaderboard', JSON.stringify(updated))
-        setNostrNoteId(fallbackNoteId)
-
-        // Nostr in background — patches leaderboard entry when done
-        nostrAPI.publishVerdict(company, verdict, groq.narrative, 250).then((nostrResult) => {
-          if (nostrResult?.noteId) {
-            const saved = JSON.parse(localStorage.getItem('veridion_leaderboard') || '[]')
-            const patched = saved.map(e => e.company === company ? { ...e, nostrNoteId: nostrResult.noteId } : e)
-            localStorage.setItem('veridion_leaderboard', JSON.stringify(patched))
-          }
-        }).catch(() => {})
-
-      } catch (err) {
-        console.error('[Audit Pipeline Error]:', err.message)
-        // If we already have a verdict, save a partial leaderboard entry and complete
-        const currentVerdict = useAuditStore.getState().verdict
-        if (currentVerdict) {
-          const fallbackNoteId = `note1fallback${Math.random().toString(36).slice(2, 18)}`
-          const entry = { company, verdict: currentVerdict, narrative: useAuditStore.getState().narrative, nostrNoteId: fallbackNoteId, timestamp: new Date().toISOString(), claim: claimText || `${company} ESG claims` }
-          const existing = JSON.parse(localStorage.getItem('veridion_leaderboard') || '[]')
-          const updated = [entry, ...existing.filter(e => e.company !== company)].slice(0, 20)
-          localStorage.setItem('veridion_leaderboard', JSON.stringify(updated))
-        }
-        setError(err.message)
-      }
+    source.onerror = () => {
+      if (phase === 'COMPLETE') return
+      setPhase('ERROR')
+      source.close()
     }
-    runAudit()
+
+    return () => source.close()
   }, [targetCompany])
+
+  const phaseLabel = {
+    CONNECTING: 'Connecting to Oracle Network...',
+    RUNNING: 'Oracle Nodes Executing...',
+    CONSENSUS: 'Consensus Reached',
+    SIGNING: 'FROST Signature Aggregation',
+    COMPLETE: 'Audit Finalized — Redirecting...',
+    ERROR: 'Oracle Error',
+  }
+
+  const phaseColor = {
+    CONNECTING: '#FBBF24',
+    RUNNING: '#FF6B2B',
+    CONSENSUS: '#22C55E',
+    SIGNING: '#A78BFA',
+    COMPLETE: '#22C55E',
+    ERROR: '#EF4444',
+  }
 
   return (
     <Box className="aurora-bg grid-bg" minH="100vh" py={8} position="relative" overflow="hidden">
       <Box className="orb orb-orange" w="400px" h="400px" top="-80px" right="-80px" />
       <Box className="orb orb-purple" w="280px" h="280px" bottom="60px" left="-40px" />
-      <Container maxW="container.lg" position="relative" zIndex={1}>
+      <Container maxW="container.xl" position="relative" zIndex={1}>
         <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} transition={{ duration:0.4 }}>
-        <VStack spacing={6} align="stretch">
-          {error && (
-            <Alert status="warning" borderRadius="xl"
-              bg="rgba(251,191,36,0.1)" border="1px solid rgba(251,191,36,0.25)">
-              <AlertIcon color="#FBBF24" />
-              <AlertDescription color="rgba(255,255,255,0.8)" fontSize="sm">{error} — continuing with available data</AlertDescription>
-            </Alert>
-          )}
+        <VStack spacing={5} align="stretch">
 
-          {/* Company Info */}
+          {/* Header card */}
           <Card className="glass" border="1px solid rgba(255,107,43,0.2)">
-            <CardBody>
-              <HStack justify="space-between" align="start">
-                <VStack align="start" spacing={2}>
-                  <Text fontSize="xs" color="rgba(255,255,255,0.4)" textTransform="uppercase" letterSpacing="0.1em">Auditing</Text>
-                  <Heading as="h2" size="lg" color="white" fontFamily="heading">{claim?.company}</Heading>
-                  <Text fontSize="sm" color="rgba(255,255,255,0.55)" maxW="450px" noOfLines={2}>"{claim?.claim}"</Text>
+            <CardBody py={4}>
+              <HStack justify="space-between" align="center" flexWrap="wrap" gap={3}>
+                <VStack align="start" spacing={1}>
+                  <HStack spacing={3}>
+                    <Text fontSize="xs" color="rgba(255,255,255,0.4)" textTransform="uppercase" letterSpacing="0.1em">FROST Oracle Audit</Text>
+                    <Badge bg="rgba(167,139,250,0.15)" color="#A78BFA" fontSize="2xs" borderRadius="full" px={2}>2-of-3 Threshold</Badge>
+                  </HStack>
+                  <Heading as="h2" size="lg" color="white" fontFamily="heading">{targetCompany}</Heading>
                 </VStack>
-                <Badge
-                  bg={auditPhase === 'COMPLETE' ? 'rgba(34,197,94,0.15)' : auditPhase === 'ERROR' ? 'rgba(239,68,68,0.15)' : 'rgba(255,107,43,0.15)'}
-                  color={auditPhase === 'COMPLETE' ? '#22C55E' : auditPhase === 'ERROR' ? '#EF4444' : '#FF9B51'}
-                  border="1px solid"
-                  borderColor={auditPhase === 'COMPLETE' ? 'rgba(34,197,94,0.3)' : auditPhase === 'ERROR' ? 'rgba(239,68,68,0.3)' : 'rgba(255,107,43,0.3)'}
-                  px={4} py={2} fontSize="xs" borderRadius="full"
-                >
-                  {phaseLabels[auditPhase] || auditPhase}
-                </Badge>
+                <VStack align="end" spacing={0}>
+                  <Badge
+                    bg={`${phaseColor[phase]}22`} color={phaseColor[phase]}
+                    border="1px solid" borderColor={`${phaseColor[phase]}44`}
+                    px={3} py={1} fontSize="xs" borderRadius="full">
+                    {phaseLabel[phase]}
+                  </Badge>
+                  {oracleInit?.taproot?.testnet && (
+                    <Text fontSize="2xs" color="rgba(255,255,255,0.3)" fontFamily="mono" mt={1}>
+                      P2TR: {oracleInit.taproot.testnet.slice(0, 14)}...{oracleInit.taproot.testnet.slice(-6)}
+                    </Text>
+                  )}
+                </VStack>
               </HStack>
             </CardBody>
           </Card>
 
-          {/* Progress */}
-          <Card className="glass" border="1px solid rgba(255,107,43,0.15)">
-            <CardBody>
-              <VStack spacing={4} align="start">
-                <HStack justify="space-between" w="full">
-                  <Text fontWeight={700} color="rgba(255,255,255,0.8)" fontSize="xs" textTransform="uppercase" letterSpacing="0.1em">Audit Progress</Text>
-                  <Text fontWeight={800} color="#FF6B2B" fontSize="lg">{progress}%</Text>
-                </HStack>
-                <Box w="full" h="6px" bg="rgba(255,255,255,0.08)" borderRadius="full" overflow="hidden">
-                  <MotionBox
-                    h="full" borderRadius="full"
-                    bg="linear-gradient(to right, #FF6B2B, #FBBF24)"
-                    initial={{ width: 0 }}
-                    animate={{ width: `${progress}%` }}
-                    transition={{ duration: 0.8, ease: 'easeOut' }}
-                  />
+          {/* FROST info strip */}
+          {oracleInit && (
+            <SimpleGrid columns={{ base: 2, md: 4 }} spacing={3}>
+              {[
+                { label: 'Scheme', value: 'FROST', sub: 'Schnorr Threshold' },
+                { label: 'Threshold', value: '2-of-3', sub: 'Byzantine fault tolerant' },
+                { label: 'Group Key', value: oracleInit.groupPubKey?.slice(0,12) + '...', sub: 'BIP-340 x-only' },
+                { label: 'Network', value: 'Bitcoin', sub: 'Taproot P2TR' },
+              ].map(({ label, value, sub }) => (
+                <Box key={label} className="glass" p={3} borderRadius="lg" border="1px solid rgba(255,255,255,0.06)">
+                  <Text fontSize="2xs" color="rgba(255,255,255,0.4)" textTransform="uppercase" letterSpacing="0.08em">{label}</Text>
+                  <Text fontSize="sm" color="white" fontWeight={700} fontFamily="mono">{value}</Text>
+                  <Text fontSize="2xs" color="rgba(255,255,255,0.3)">{sub}</Text>
                 </Box>
-                <SimpleGrid columns={7} spacing={1} w="full">
-                  {['EIA', 'EPA', 'SEC', 'AI Verdict', 'Narrative', 'Nostr', 'Done'].map((step, i) => (
-                    <Text key={step} fontSize="9px" textAlign="center"
-                      color={progress >= ((i + 1) / 7) * 100 ? '#FF6B2B' : 'rgba(255,255,255,0.3)'}
-                      fontWeight={progress >= ((i + 1) / 7) * 100 ? 800 : 400}>
-                      {step}
-                    </Text>
-                  ))}
-                </SimpleGrid>
-              </VStack>
-            </CardBody>
-          </Card>
+              ))}
+            </SimpleGrid>
+          )}
 
-          {/* Data Tabs */}
-          <Tabs variant="soft-rounded" colorScheme="orange">
-            <TabList className="glass" p={3} borderRadius="lg" gap={2} flexWrap="wrap" border="1px solid rgba(255,107,43,0.15)">
-              <Tab color="rgba(255,255,255,0.6)" _selected={{ bg: '#FF6B2B', color: 'white' }}>Claim</Tab>
-              <Tab color="rgba(255,255,255,0.6)" _selected={{ bg: '#FF6B2B', color: 'white' }}>EIA {eiaData && '✓'}</Tab>
-              <Tab color="rgba(255,255,255,0.6)" _selected={{ bg: '#FF6B2B', color: 'white' }}>EPA {epaData && '✓'}</Tab>
-              <Tab color="rgba(255,255,255,0.6)" _selected={{ bg: '#FF6B2B', color: 'white' }}>SEC EDGAR {secData && '✓'}</Tab>
-            </TabList>
-            <TabPanels>
-              <TabPanel>
-                <Card className="glass" border="1px solid rgba(255,107,43,0.15)">
-                  <CardBody>
-                    <VStack align="start" spacing={3}>
-                      <Text color="white" fontWeight={700} fontSize="md">Company ESG Claim</Text>
-                      <Text color="rgba(255,255,255,0.7)" lineHeight="tall">"{claim?.claim}"</Text>
-                      <HStack spacing={3} flexWrap="wrap">
-                        <Badge bg="rgba(255,107,43,0.15)" color="#FF9B51" borderRadius="full" px={3}>Claimed Renewable: {claim?.claimedRenewable}%</Badge>
-                        <Badge bg="rgba(91,127,255,0.1)" color="#5B7FFF" borderRadius="full" px={3}>{claim?.location}</Badge>
-                        <Badge bg="rgba(255,255,255,0.08)" color="rgba(255,255,255,0.6)" borderRadius="full" px={3}>{claim?.year}</Badge>
+          {/* 3 Oracle Terminal Panels */}
+          <Box>
+            <HStack mb={3} spacing={2}>
+              <Text fontSize="xs" color="rgba(255,255,255,0.4)" textTransform="uppercase" letterSpacing="0.1em" fontWeight={700}>
+                Oracle Nodes
+              </Text>
+              <Box flex={1} h="1px" bg="rgba(255,255,255,0.06)" />
+            </HStack>
+            <SimpleGrid columns={{ base: 1, md: 3 }} spacing={4}>
+              <OracleTerminal nodeId={1} logs={nodeLogs[1]} status={nodeStatus[1]} />
+              <OracleTerminal nodeId={2} logs={nodeLogs[2]} status={nodeStatus[2]} />
+              <OracleTerminal nodeId={3} logs={nodeLogs[3]} status={nodeStatus[3]} />
+            </SimpleGrid>
+          </Box>
+
+          {/* Consensus Status */}
+          {consensus && (
+            <MotionBox initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
+              <Card className="glass" border={`1px solid ${consensus.fraudDetected ? 'rgba(239,68,68,0.3)' : 'rgba(34,197,94,0.3)'}`}>
+                <CardBody py={4}>
+                  <HStack justify="space-between" flexWrap="wrap" gap={3}>
+                    <VStack align="start" spacing={1}>
+                      <HStack spacing={2}>
+                        <Text fontSize="xs" color="rgba(255,255,255,0.4)" textTransform="uppercase" letterSpacing="0.1em">Consensus</Text>
+                        <Badge bg={consensus.fraudDetected ? 'rgba(239,68,68,0.15)' : 'rgba(34,197,94,0.15)'} color={consensus.fraudDetected ? '#EF4444' : '#22C55E'} fontSize="2xs" borderRadius="full" px={2}>
+                          {consensus.fraudDetected ? 'FRAUD DETECTED' : 'CLEAN'}
+                        </Badge>
                       </HStack>
+                      <Text color="white" fontWeight={700} fontSize="md">
+                        {consensus.fraudVotes}/{consensus.totalNodes} nodes agree — {consensus.consensusReached ? 'threshold met' : 'no consensus'}
+                      </Text>
                     </VStack>
-                  </CardBody>
-                </Card>
-              </TabPanel>
+                    <HStack spacing={3}>
+                      {consensus.nodeVotes?.map(v => (
+                        <VStack key={v.id} spacing={0} px={3} py={2} bg="rgba(0,0,0,0.3)" borderRadius="lg" border="1px solid rgba(255,255,255,0.06)">
+                          <Text fontSize="2xs" color="rgba(255,255,255,0.4)">Node {v.id}</Text>
+                          <Text fontSize="sm" fontWeight={800} color={v.fraud ? '#EF4444' : '#22C55E'}>{v.risk}</Text>
+                          <Text fontSize="2xs" color={v.fraud ? '#EF4444' : '#22C55E'}>{v.fraud ? 'FRAUD' : 'CLEAN'}</Text>
+                        </VStack>
+                      ))}
+                    </HStack>
+                  </HStack>
+                </CardBody>
+              </Card>
+            </MotionBox>
+          )}
 
-              {/* EIA Tab */}
-              <TabPanel>
-                <Card className="glass" border="1px solid rgba(255,107,43,0.15)">
-                  <CardBody>
-                    {eiaData ? (
-                      <VStack align="start" spacing={4}>
-                        <Text color="white" fontWeight={700} fontSize="md">EIA Energy Grid — Claimed vs Actual</Text>
-                        <SimpleGrid columns={2} spacing={4} w="full">
-                          <Stat><StatLabel color="rgba(255,255,255,0.55)" fontSize="sm">Actual Renewable %</StatLabel><StatNumber color="#FF6B2B">{eiaData.renewable}%</StatNumber></Stat>
-                          <Stat><StatLabel color="rgba(255,255,255,0.55)" fontSize="sm">Grid Capacity (GW)</StatLabel><StatNumber color="#FF6B2B">{eiaData.capacity}</StatNumber></Stat>
-                        </SimpleGrid>
-                        <Box w="full" h="200px">
-                          <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={[{ name: 'Claimed', value: claim?.claimedRenewable ?? 100 }, { name: 'Actual (EIA)', value: eiaData.renewable }]} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-                              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
-                              <XAxis dataKey="name" tick={{ fill: 'rgba(255,255,255,0.6)', fontSize: 12 }} />
-                              <YAxis domain={[0, 100]} unit="%" tick={{ fill: 'rgba(255,255,255,0.6)', fontSize: 12 }} />
-                              <Tooltip contentStyle={{ background: '#0D1829', border: '1px solid rgba(255,107,43,0.3)', borderRadius: 8 }} formatter={(v) => `${v}%`} />
-                              <Bar dataKey="value" radius={[6, 6, 0, 0]} maxBarSize={60}>
-                                <Cell fill="#FF9B51" />
-                                <Cell fill={eiaData.renewable >= (claim?.claimedRenewable ?? 80) ? '#48BB78' : '#FC8181'} />
-                              </Bar>
-                            </BarChart>
-                          </ResponsiveContainer>
+          {/* FROST Signature */}
+          {signature && (
+            <MotionBox initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.2 }}>
+              <Card className="glass" borderLeft="4px solid #A78BFA">
+                <CardBody py={4}>
+                  <VStack align="start" spacing={3}>
+                    <HStack spacing={2}>
+                      <Text fontSize="xs" color="#A78BFA" textTransform="uppercase" letterSpacing="0.1em" fontWeight={700}>FROST Schnorr Signature</Text>
+                      {signature.valid && <Badge bg="rgba(34,197,94,0.15)" color="#22C55E" fontSize="2xs" borderRadius="full" px={2}>VALID</Badge>}
+                    </HStack>
+                    <SimpleGrid columns={{ base: 1, md: 2 }} spacing={3} w="full">
+                      <Box>
+                        <Text fontSize="2xs" color="rgba(255,255,255,0.4)" mb={1}>R (Nonce Point)</Text>
+                        <Box p={2} bg="rgba(0,0,0,0.3)" borderRadius="md" border="1px solid rgba(167,139,250,0.15)">
+                          <Text fontSize="2xs" fontFamily="mono" color="rgba(255,255,255,0.7)" wordBreak="break-all">{signature.R}</Text>
                         </Box>
-                        <Text fontSize="xs" color="rgba(255,255,255,0.35)">Source: {eiaData.source} • State: {eiaData.state}</Text>
-                      </VStack>
-                    ) : <VStack spacing={3}><Progress size="xs" isIndeterminate colorScheme="orange" w="full" sx={{ '& > div': { bg: 'linear-gradient(to right,#FF6B2B,#FBBF24)' } }} /><Text color="rgba(255,255,255,0.4)" fontSize="sm">Fetching EIA data...</Text></VStack>}
-                  </CardBody>
-                </Card>
-              </TabPanel>
-
-              {/* EPA Tab */}
-              <TabPanel>
-                <Card className="glass" border="1px solid rgba(255,107,43,0.15)">
-                  <CardBody>
-                    {epaData ? (
-                      <VStack align="start" spacing={4}>
-                        <Text color="white" fontWeight={700} fontSize="md">EPA Emissions — CO₂ vs Benchmarks</Text>
-                        <SimpleGrid columns={2} spacing={4} w="full">
-                          <Stat><StatLabel color="rgba(255,255,255,0.55)" fontSize="sm">CO₂ Intensity</StatLabel><StatNumber color="#FF6B2B">{epaData.co2}</StatNumber><Text fontSize="xs" opacity={0.5} color="white">{epaData.unit}</Text></Stat>
-                          <Stat><StatLabel color="rgba(255,255,255,0.55)" fontSize="sm">Data Year</StatLabel><StatNumber color="#FF6B2B">{epaData.year}</StatNumber></Stat>
-                        </SimpleGrid>
-                        <Box w="full" h="200px">
-                          <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={[{ name: 'Actual CO₂', value: epaData.co2 }, { name: 'US Avg', value: 450 }, { name: 'Clean Grid', value: 50 }]} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-                              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
-                              <XAxis dataKey="name" tick={{ fill: 'rgba(255,255,255,0.6)', fontSize: 12 }} />
-                              <YAxis unit=" lb" tick={{ fill: 'rgba(255,255,255,0.6)', fontSize: 12 }} />
-                              <Tooltip contentStyle={{ background: '#0D1829', border: '1px solid rgba(255,107,43,0.3)', borderRadius: 8 }} formatter={(v) => `${v} lbs/MWh`} />
-                              <Bar dataKey="value" radius={[6, 6, 0, 0]} maxBarSize={60}>
-                                <Cell fill={epaData.co2 > 450 ? '#EF4444' : epaData.co2 < 100 ? '#22C55E' : '#FF6B2B'} />
-                                <Cell fill="rgba(255,255,255,0.2)" /><Cell fill="#22C55E" />
-                              </Bar>
-                            </BarChart>
-                          </ResponsiveContainer>
+                      </Box>
+                      <Box>
+                        <Text fontSize="2xs" color="rgba(255,255,255,0.4)" mb={1}>s (Aggregated Scalar)</Text>
+                        <Box p={2} bg="rgba(0,0,0,0.3)" borderRadius="md" border="1px solid rgba(167,139,250,0.15)">
+                          <Text fontSize="2xs" fontFamily="mono" color="rgba(255,255,255,0.7)" wordBreak="break-all">{signature.s}</Text>
                         </Box>
-                        <Text fontSize="xs" color="rgba(255,255,255,0.35)">Source: {epaData.source}</Text>
-                      </VStack>
-                    ) : <VStack spacing={3}><Progress size="xs" isIndeterminate colorScheme="orange" w="full" /><Text color="rgba(255,255,255,0.4)" fontSize="sm">Fetching EPA data...</Text></VStack>}
-                  </CardBody>
-                </Card>
-              </TabPanel>
+                      </Box>
+                    </SimpleGrid>
+                    <Text fontSize="2xs" color="rgba(255,255,255,0.3)">
+                      Participating nodes: {signature.participatingNodes?.join(', ')} · Aggregate pubkey: {signature.aggregatePubKey?.slice(0,16)}...
+                    </Text>
+                  </VStack>
+                </CardBody>
+              </Card>
+            </MotionBox>
+          )}
 
-              {/* SEC EDGAR Tab */}
-              <TabPanel>
-                <Card className="glass" border="1px solid rgba(255,107,43,0.15)">
-                  <CardBody>
-                    {secData ? (
-                      <VStack align="start" spacing={4}>
-                        <HStack justify="space-between" w="full">
-                          <Text color="white" fontWeight={700} fontSize="md">SEC EDGAR Filings</Text>
-                          <Badge
-                            bg={secData.disclosureRisk === 'HIGH' ? 'rgba(239,68,68,0.15)' : 'rgba(251,191,36,0.15)'}
-                            color={secData.disclosureRisk === 'HIGH' ? '#EF4444' : '#FBBF24'}
-                            fontSize="xs" borderRadius="full" px={3}>
-                            Disclosure Risk: {secData.disclosureRisk}
-                          </Badge>
-                        </HStack>
-                        <Text color="rgba(255,255,255,0.6)" fontSize="sm">{secData.esgStatement}</Text>
-                        {secData.esgClaims?.length > 0 && (
-                          <List spacing={2} w="full">
-                            {secData.esgClaims.map((c, i) => (
-                              <ListItem key={i} fontSize="sm" color="rgba(255,255,255,0.7)">
-                                <ListIcon as={c.formType === '10-K' ? CheckCircleIcon : WarningIcon} color="#FF6B2B" />
-                                {c.excerpt}
-                              </ListItem>
-                            ))}
-                          </List>
-                        )}
-                        <Text fontSize="xs" color="rgba(255,255,255,0.3)">Source: {secData.dataSource}</Text>
-                        <Text as="a" href={secData.edgarUrl} target="_blank" rel="noopener noreferrer"
-                          fontSize="xs" color="#5B7FFF" textDecoration="underline">
-                          View on SEC EDGAR →
-                        </Text>
-                      </VStack>
-                    ) : (
-                      <VStack spacing={3}>
-                        <Progress size="xs" isIndeterminate colorScheme="orange" w="full" />
-                        <Text color="rgba(255,255,255,0.4)" fontSize="sm">Searching SEC EDGAR filings...</Text>
-                      </VStack>
-                    )}
-                  </CardBody>
-                </Card>
-              </TabPanel>
-            </TabPanels>
-          </Tabs>
+          {/* Bitcoin Transaction */}
+          {transaction && (
+            <MotionBox initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.4 }}>
+              <Card className="glass" borderLeft="4px solid #FF6B2B">
+                <CardBody py={4}>
+                  <VStack align="start" spacing={3}>
+                    <HStack spacing={2}>
+                      <Text fontSize="xs" color="#FF6B2B" textTransform="uppercase" letterSpacing="0.1em" fontWeight={700}>Bitcoin Taproot Transaction</Text>
+                      <Badge bg="rgba(255,107,43,0.15)" color="#FF9B51" fontSize="2xs" borderRadius="full" px={2}>OP_RETURN</Badge>
+                    </HStack>
+                    <SimpleGrid columns={{ base: 1, md: 2 }} spacing={3} w="full">
+                      <Box>
+                        <Text fontSize="2xs" color="rgba(255,255,255,0.4)" mb={1}>TxID</Text>
+                        <Text fontSize="2xs" fontFamily="mono" color="#FF9B51" wordBreak="break-all">{transaction.txId}</Text>
+                      </Box>
+                      <Box>
+                        <Text fontSize="2xs" color="rgba(255,255,255,0.4)" mb={1}>Verdict Inscription</Text>
+                        <Text fontSize="2xs" fontFamily="mono" color="rgba(255,255,255,0.7)">{transaction.opReturn}</Text>
+                      </Box>
+                    </SimpleGrid>
+                    <HStack spacing={3} flexWrap="wrap">
+                      <Text fontSize="2xs" color="rgba(255,255,255,0.3)">Size: {transaction.size} bytes</Text>
+                      <Divider orientation="vertical" h={3} borderColor="rgba(255,255,255,0.1)" />
+                      <Text fontSize="2xs" color="rgba(255,255,255,0.3)">P2TR: {transaction.taprootAddress?.slice(0, 14)}...</Text>
+                      <Divider orientation="vertical" h={3} borderColor="rgba(255,255,255,0.1)" />
+                      <Text as="a" href={transaction.mempoolUrl} target="_blank" rel="noopener noreferrer"
+                        fontSize="2xs" color="#5B7FFF" _hover={{ textDecoration: 'underline' }}>
+                        View on mempool.space →
+                      </Text>
+                    </HStack>
+                  </VStack>
+                </CardBody>
+              </Card>
+            </MotionBox>
+          )}
+
+          {/* Phase progress */}
+          {phase === 'COMPLETE' && (
+            <MotionBox initial={{ opacity: 0 }} animate={{ opacity: 1 }} textAlign="center" py={4}>
+              <Text color="#22C55E" fontWeight={700} fontSize="sm">
+                Audit finalized — redirecting to results...
+              </Text>
+            </MotionBox>
+          )}
         </VStack>
         </motion.div>
       </Container>

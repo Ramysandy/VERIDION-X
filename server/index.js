@@ -10,6 +10,7 @@ import firecrawlRoutes from './routes/firecrawl.js'
 import nostrRoutes from './routes/nostr.js'
 import auditRoutes from './routes/audit.js'
 import secRoutes from './routes/sec.js'
+import oracleRoutes from './routes/oracle.js'
 
 // Load environment variables
 const app = express()
@@ -36,6 +37,7 @@ app.use('/api/firecrawl', firecrawlRoutes)
 app.use('/api/nostr', nostrRoutes)
 app.use('/api/audit', auditRoutes)
 app.use('/api/sec', secRoutes)
+app.use('/api/oracle', oracleRoutes)
 
 // Error handling middleware
 app.use((err, req, res, next) => {
@@ -75,6 +77,8 @@ app.listen(PORT, () => {
   console.log('  POST /api/groq/analyze           - Generate analysis')
   console.log('  POST /api/firecrawl/scrape       - Scrape claims')
   console.log('  POST /api/nostr/publish          - Publish proof')
+  console.log('  GET  /api/oracle/stream          - FROST oracle SSE')
+  console.log('  GET  /api/oracle/info            - Oracle status')
 })
 
 export default app
