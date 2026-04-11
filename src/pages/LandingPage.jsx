@@ -7,7 +7,6 @@ import { useNavigate } from 'react-router-dom'
 import { useState, useEffect, useRef } from 'react'
 import { ArrowForwardIcon } from '@chakra-ui/icons'
 import { useAuditStore } from '../store/auditStore'
-import { firecrawlAPI } from '../api/client'
 
 const MotionBox  = motion(Box)
 const MotionText = motion(Text)

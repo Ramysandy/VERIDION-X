@@ -10,18 +10,21 @@ import Navigation from './components/Navigation'
 import { useAuditStore } from './store/auditStore'
 
 function AppContent() {
+  const targetCompany = useAuditStore((state) => state.targetCompany)
   const claim = useAuditStore((state) => state.claim)
   const auditPhase = useAuditStore((state) => state.auditPhase)
   const navigate = useNavigate()
 
+  // Only redirect if no audit is active AND not on a public page
   useEffect(() => {
     const path = window.location.pathname
-    if (!claim && path !== '/') {
+    if (!targetCompany && !claim && path !== '/' && path !== '/leaderboard') {
       navigate('/')
     }
-  }, [claim, navigate])
+  }, [targetCompany, claim, navigate])
 
   const showResults = auditPhase === 'COMPLETE' || auditPhase === 'ERROR'
+  const hasAudit = !!(targetCompany || claim)
 
   return (
     <Box minH="100vh" bg="brand.light">
@@ -29,8 +32,8 @@ function AppContent() {
       <VStack spacing={0} align="stretch" w="full">
         <Routes>
           <Route path="/" element={<LandingPage />} />
-          <Route path="/audit" element={claim ? <AuditFlowPage /> : <LandingPage />} />
-          <Route path="/results" element={showResults && claim ? <ResultsPage /> : <LandingPage />} />
+          <Route path="/audit" element={hasAudit ? <AuditFlowPage /> : <LandingPage />} />
+          <Route path="/results" element={showResults && hasAudit ? <ResultsPage /> : <LandingPage />} />
           <Route path="/leaderboard" element={<LeaderboardPage />} />
           <Route path="*" element={<LandingPage />} />
         </Routes>

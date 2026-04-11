@@ -111,29 +111,31 @@ export default function AuditFlowPage() {
         const claimObj = { company, claim: claimText, claimedRenewable, state }
         setClaimData(claimObj)
 
-        // Step 1: EIA
-        const eia = await eiaAPI.getRenewableCapacity(state, company)
+        // Steps 1-3: EIA, EPA, SEC in parallel (SEC capped at 3s — non-critical)
+        const secRace = Promise.race([
+          secAPI.getFilings(company),
+          new Promise((_, rej) => setTimeout(() => rej(new Error('SEC timeout')), 3000))
+        ]).catch(() => null)
+
+        const [eia, epa] = await Promise.all([
+          eiaAPI.getRenewableCapacity(state, company),
+          epaAPI.getEmissions(state, company),
+        ])
         addPayment(100, 'EIA')
         setEiaData({ renewable: eia.renewablePercentage, capacity: Math.round((eia.totalCapacity || 250000) / 1000), state: eia.state, source: eia.dataSource, totalCapacity: eia.totalCapacity })
 
-        // Step 2: EPA
-        const epa = await epaAPI.getEmissions(state, company)
         addPayment(100, 'EPA')
         setEpaData({ co2: epa.co2Intensity, year: epa.details?.year || 2024, unit: epa.unit, source: epa.dataSource })
 
-        // Step 3: SEC EDGAR
         setAuditPhase('CHECKING_SEC')
-        let sec = null
-        try {
-          sec = await secAPI.getFilings(company)
-          setSecData(sec)
-        } catch { /* non-fatal */ }
+        const sec = await secRace
+        if (sec) setSecData(sec)
 
-        // Step 4: AI verdict via Groq
+        // Step 4: AI verdict via Groq — pass full data for company-specific analysis
         setAuditPhase('SCORING')
         const groq = await groqAPI.analyzeClaim(company, claimText,
-          { renewablePercentage: eia.renewablePercentage, totalCapacity: eia.totalCapacity },
-          { co2Intensity: epa.co2Intensity },
+          { renewablePercentage: eia.renewablePercentage, totalCapacity: eia.totalCapacity, fossilPercentage: eia.fossilPercentage, year: eia.year, details: eia.details },
+          { co2Intensity: epa.co2Intensity, stateBaseline: epa.stateBaseline, nationalAverage: epa.nationalAverage, sectorMultiplier: epa.sectorMultiplier },
           sec
         )
         addPayment(50, 'Groq AI')
@@ -154,17 +156,22 @@ export default function AuditFlowPage() {
         setVerdict(verdict)
         setNarrative(groq.narrative)
 
-        // Step 5: Nostr blockchain
-        const nostrResult = await nostrAPI.publishVerdict(company, verdict, groq.narrative, 250)
-
-        // Save to leaderboard BEFORE setNostrNoteId (which triggers navigation to /results)
-        const entry = { company, verdict, narrative: groq.narrative, nostrNoteId: nostrResult.noteId, timestamp: new Date().toISOString(), claim: claimText }
+        // Step 5: Save leaderboard & navigate IMMEDIATELY, run Nostr in background
+        const fallbackNoteId = `note1pending${Math.random().toString(36).slice(2, 18)}`
+        const entry = { company, verdict, narrative: groq.narrative, nostrNoteId: fallbackNoteId, timestamp: new Date().toISOString(), claim: claimText }
         const existing = JSON.parse(localStorage.getItem('veridion_leaderboard') || '[]')
         const updated = [entry, ...existing.filter(e => e.company !== company)].slice(0, 20)
         localStorage.setItem('veridion_leaderboard', JSON.stringify(updated))
+        setNostrNoteId(fallbackNoteId)
 
-        // This triggers auditPhase: 'COMPLETE' → navigate('/results')
-        setNostrNoteId(nostrResult.noteId)
+        // Nostr in background — patches leaderboard entry when done
+        nostrAPI.publishVerdict(company, verdict, groq.narrative, 250).then((nostrResult) => {
+          if (nostrResult?.noteId) {
+            const saved = JSON.parse(localStorage.getItem('veridion_leaderboard') || '[]')
+            const patched = saved.map(e => e.company === company ? { ...e, nostrNoteId: nostrResult.noteId } : e)
+            localStorage.setItem('veridion_leaderboard', JSON.stringify(patched))
+          }
+        }).catch(() => {})
 
       } catch (err) {
         console.error('[Audit Pipeline Error]:', err.message)
