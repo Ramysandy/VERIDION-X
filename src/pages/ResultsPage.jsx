@@ -41,6 +41,7 @@ import { useAuditStore } from '../store/auditStore'
 import apiClient from '../api/client'
 import FROSTCeremony from '../components/FROSTCeremony'
 import MerkleExplorer from '../components/MerkleExplorer'
+import { QRCodeSVG } from 'qrcode.react'
 
 const MotionBox = motion(Box)
 const MotionCard = motion(Card)
@@ -114,6 +115,7 @@ export default function ResultsPage() {
   const merkleTree = useAuditStore((s) => s.merkleTree)
   const tapscriptInfo = useAuditStore((s) => s.tapscriptInfo)
   const lightningInvoice = useAuditStore((s) => s.lightningInvoice)
+  const [payStatus, setPayStatus] = useState('pending')
 
   const [sigVerified, setSigVerified] = useState(null) // null | 'loading' | { valid, ... }
   const [testnetInfo, setTestnetInfo] = useState(null)
@@ -147,6 +149,23 @@ export default function ResultsPage() {
         .catch(() => setTestnetInfo(null))
     }
   }, [taprootAddress])
+
+  // Poll Lightning payment status every 2s until paid
+  useEffect(() => {
+    if (!lightningInvoice?.paymentHash || lightningInvoice.demo) return
+    if (payStatus === 'paid') return
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
+    const interval = setInterval(async () => {
+      try {
+        const r = await fetch(`${apiUrl}/lightning/invoice/${lightningInvoice.paymentHash}`)
+        if (r.ok) {
+          const data = await r.json()
+          if (data.paid) { setPayStatus('paid'); clearInterval(interval) }
+        }
+      } catch { /* non-fatal */ }
+    }, 2000)
+    return () => clearInterval(interval)
+  }, [lightningInvoice, payStatus])
 
   const handleCopy = () => {
     navigator.clipboard.writeText(nostrNoteId)
@@ -267,8 +286,10 @@ export default function ResultsPage() {
                             <Heading as="h3" size="sm" color="white" fontFamily="heading">Investigator Payment</Heading>
                             {lightningInvoice.demo ? (
                               <Badge bg="rgba(251,191,36,0.15)" color="#FBBF24" fontSize="2xs" borderRadius="full" px={2}>DEMO</Badge>
+                            ) : payStatus === 'paid' ? (
+                              <Badge bg="rgba(34,197,94,0.2)" color="#22C55E" fontSize="2xs" borderRadius="full" px={2}>⚡ 1000 sats PAID ✓</Badge>
                             ) : (
-                              <Badge bg="rgba(34,197,94,0.15)" color="#22C55E" fontSize="2xs" borderRadius="full" px={2}>LIVE</Badge>
+                              <Badge bg="rgba(251,191,36,0.15)" color="#FBBF24" fontSize="2xs" borderRadius="full" px={2}>PENDING</Badge>
                             )}
                           </HStack>
                           <Text fontSize="2xs" color="rgba(255,255,255,0.45)" maxW="400px">
@@ -285,28 +306,35 @@ export default function ResultsPage() {
                         <Text fontSize="2xs" color="rgba(255,255,255,0.55)" mb={1}>
                           BOLT11 Invoice <Text as="span" color="rgba(255,255,255,0.35)">— scannable by any Lightning wallet</Text>
                         </Text>
-                        <HStack spacing={2}>
-                          <Box
-                            flex={1} p={3}
-                            bg="rgba(0,0,0,0.35)" border="1px solid rgba(251,191,36,0.2)"
-                            borderRadius="md" fontFamily="mono" fontSize="2xs"
-                            color="rgba(255,255,255,0.8)" overflowX="auto" wordBreak="break-all"
-                          >
-                            {lightningInvoice.paymentRequest}
-                          </Box>
-                          <Button
-                            size="sm"
-                            leftIcon={<CopyIcon />}
-                            bg="rgba(251,191,36,0.15)" color="#FBBF24"
-                            border="1px solid rgba(251,191,36,0.3)"
-                            _hover={{ bg: 'rgba(251,191,36,0.25)' }}
-                            onClick={() => {
-                              navigator.clipboard.writeText(lightningInvoice.paymentRequest)
-                              toast({ title: '⚡ Invoice copied!', description: 'Paste into any Lightning wallet', status: 'success', duration: 3, isClosable: true })
-                            }}
-                          >
-                            Copy
-                          </Button>
+                        <HStack spacing={4} align="start" flexWrap="wrap">
+                          {!lightningInvoice.demo && (
+                            <Box p={2} bg="white" borderRadius="md" flexShrink={0}>
+                              <QRCodeSVG value={lightningInvoice.paymentRequest} size={120} level="M" />
+                            </Box>
+                          )}
+                          <VStack flex={1} align="stretch" spacing={2}>
+                            <Box
+                              p={3}
+                              bg="rgba(0,0,0,0.35)" border="1px solid rgba(251,191,36,0.2)"
+                              borderRadius="md" fontFamily="mono" fontSize="2xs"
+                              color="rgba(255,255,255,0.8)" overflowX="auto" wordBreak="break-all"
+                            >
+                              {lightningInvoice.paymentRequest}
+                            </Box>
+                            <Button
+                              size="sm"
+                              leftIcon={<CopyIcon />}
+                              bg="rgba(251,191,36,0.15)" color="#FBBF24"
+                              border="1px solid rgba(251,191,36,0.3)"
+                              _hover={{ bg: 'rgba(251,191,36,0.25)' }}
+                              onClick={() => {
+                                navigator.clipboard.writeText(lightningInvoice.paymentRequest)
+                                toast({ title: '⚡ Invoice copied!', description: 'Paste into any Lightning wallet', status: 'success', duration: 3, isClosable: true })
+                              }}
+                            >
+                              Copy BOLT11
+                            </Button>
+                          </VStack>
                         </HStack>
                       </Box>
 

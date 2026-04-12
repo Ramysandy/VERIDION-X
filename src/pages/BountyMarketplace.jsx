@@ -273,7 +273,7 @@ export default function BountyMarketplace() {
                         { step: '1', title: 'Create Wallet', desc: 'Generate a P2TR (Taproot) testnet wallet to hold your tBTC', color: '#FBBF24' },
                         { step: '2', title: 'Post a Bounty', desc: 'Name a company & stake sats as reward for the investigation', color: '#FF6B2B' },
                         { step: '3', title: 'Claim & Audit', desc: 'Pick an open bounty, run a full FROST oracle audit on the company', color: '#22C55E' },
-                        { step: '4', title: 'Earn Payout', desc: 'After audit completes, payout is released via Tapscript timelock', color: '#A78BFA' },
+                        { step: '4', title: 'Earn Payout', desc: 'When a bounty is claimed, 1000 sats are locked in the Lightning escrow wallet. On audit completion, they auto-release to the investigator via Bitcoin Lightning — instant, no intermediary.', color: '#A78BFA' },
                       ].map(({ step, title, desc, color }) => (
                         <Box key={step} p={3} bg="rgba(0,0,0,0.25)" borderRadius="lg" border={`1px solid ${color}25`}>
                           <HStack spacing={2} mb={1}>

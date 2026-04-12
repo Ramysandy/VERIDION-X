@@ -62,7 +62,7 @@ export default function AuditFlowPage() {
     setPhase('CONNECTING')
     phaseRef.current = 'CONNECTING'
 
-    setClaimData({ company: targetCompany, claim: `${targetCompany}'s commitment to 100% renewable energy and carbon neutrality` })
+    setClaimData({ company: targetCompany, claim: `${targetCompany} public ESG disclosures vs. EIA/EPA federal grid data` })
 
     // VITE_API_URL already includes /api — strip it for SSE base, or fall back
     const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
@@ -183,6 +183,14 @@ export default function AuditFlowPage() {
           if (resp.ok) {
             const invoice = await resp.json()
             setLightningInvoice(invoice)
+            // Auto-pay the bounty from the escrow wallet
+            if (invoice.paymentRequest && !invoice.demo) {
+              fetch(`${apiUrl}/lightning/pay-bounty`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ paymentRequest: invoice.paymentRequest }),
+              }).catch(() => {/* non-fatal */})
+            }
           }
         } catch {
           // Non-fatal — audit is still complete without Lightning
@@ -333,12 +341,12 @@ export default function AuditFlowPage() {
           <Box>
             <HStack mb={1} spacing={2}>
               <Text fontSize="xs" color="rgba(255,255,255,0.55)" textTransform="uppercase" letterSpacing="0.1em" fontWeight={700}>
-                Oracle Nodes
+                Oracle Network
               </Text>
               <Box flex={1} h="1px" bg="rgba(255,255,255,0.06)" />
             </HStack>
             <Text fontSize="2xs" color="rgba(255,255,255,0.35)" mb={3}>
-              Each node independently analyzes the company using EIA, EPA, SEC, and NASA data — then they vote on whether greenwashing was detected.
+              Each node independently analyzes the company using EIA, EPA, SEC, and NASA data — then they vote on whether greenwashing was detected. (Demo: local simulation — production deploys each node to a separate operator.)
             </Text>
             <SimpleGrid columns={{ base: 1, md: 3 }} spacing={4}>
               <OracleTerminal nodeId={1} logs={nodeLogs[1]} status={nodeStatus[1]} />
