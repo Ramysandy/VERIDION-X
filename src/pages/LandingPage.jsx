@@ -2,7 +2,7 @@ import {
   Box, Container, VStack, HStack, Text, Input, Button,
   SimpleGrid, Badge, Progress, useToast,
 } from '@chakra-ui/react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion, AnimatePresence, useInView } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { useState, useEffect, useRef } from 'react'
 import { ArrowForwardIcon } from '@chakra-ui/icons'
@@ -61,6 +61,140 @@ const QUICK_COMPANIES = ['ExxonMobil', 'Amazon', 'Shell', 'BP', 'Tesla']
 
 const fadeUp = { hidden: { opacity: 0, y: 30 }, show: { opacity: 1, y: 0, transition: { duration: 0.6, ease: 'easeOut' } } }
 const stagger = { hidden: {}, show: { transition: { staggerChildren: 0.1 } } }
+
+/* ── Animated Mind Map ────────────────────────────────────────── */
+function MindMapFlow() {
+  const ref = useRef(null)
+  const isInView = useInView(ref, { once: true, margin: '-80px' })
+
+  const W = 700, H = 570, CX = 350, CY = 285
+  const CENTER_R = 50, CARD_W = 158, CARD_H = 122
+
+  const nodes = [
+    { step: '01', icon: '🛰️', title: 'The Hunt',            color: '#FF9B51', nx: CX,  ny: 72,  desc: '3 oracle nodes query EIA, EPA, SEC & NASA POWER satellites. Bounty investigators fund the audit.' },
+    { step: '02', icon: '🤖', title: 'The Consensus',       color: '#A78BFA', nx: 610, ny: CY,  desc: 'Each node runs Groq llama-3.3-70b independently. 2-of-3 threshold triggers FROST nonce commitments.' },
+    { step: '03', icon: '🔐', title: 'The Proof',           color: '#22C55E', nx: CX,  ny: 500, desc: 'Partial sigs aggregate into BIP-340 Schnorr. Sealed via recursive OP_RETURN chain & Merkle root.' },
+    { step: '04', icon: '⚡', title: 'Get Paid in Bitcoin',  color: '#FBBF24', nx: 90,  ny: CY,  desc: 'Real Lightning invoice auto-generated via LNbits. Any wallet pays instantly. No bank. No waiting.' },
+  ]
+
+  const getLinePts = (nx, ny) => {
+    const dx = nx - CX, dy = ny - CY
+    const dist = Math.sqrt(dx * dx + dy * dy)
+    const endOffset = Math.abs(dy) > Math.abs(dx) ? CARD_H / 2 + 6 : CARD_W / 2 + 6
+    return {
+      x1: CX + (dx / dist) * (CENTER_R + 5),
+      y1: CY + (dy / dist) * (CENTER_R + 5),
+      x2: nx - (dx / dist) * endOffset,
+      y2: ny - (dy / dist) * endOffset,
+    }
+  }
+
+  return (
+    <Box ref={ref}>
+      {/* Desktop mind map */}
+      <Box display={{ base: 'none', lg: 'block' }}>
+        <Box position="relative" w={`${W}px`} h={`${H}px`} mx="auto">
+          <svg width={W} height={H} style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
+            <defs>
+              {nodes.map(n => (
+                <marker key={n.step} id={`a-${n.step}`} markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+                  <polygon points="0 0, 8 4, 0 8" fill={n.color} opacity="0.85" />
+                </marker>
+              ))}
+            </defs>
+            <circle cx={CX} cy={CY} r={CENTER_R + 22} stroke="rgba(255,107,43,0.1)" strokeWidth="1" fill="none" strokeDasharray="3 7" />
+            {nodes.map((n, i) => {
+              const p = getLinePts(n.nx, n.ny)
+              return (
+                <motion.path
+                  key={n.step}
+                  d={`M ${p.x1.toFixed(1)} ${p.y1.toFixed(1)} L ${p.x2.toFixed(1)} ${p.y2.toFixed(1)}`}
+                  stroke={n.color} strokeWidth="1.5" fill="none" strokeOpacity="0.65"
+                  markerEnd={`url(#a-${n.step})`}
+                  initial={{ pathLength: 0, opacity: 0 }}
+                  animate={isInView ? { pathLength: 1, opacity: 1 } : {}}
+                  transition={{ duration: 0.7, delay: 0.4 + i * 0.2, ease: 'easeOut' }}
+                />
+              )
+            })}
+          </svg>
+
+          {/* Center hub */}
+          <motion.div
+            style={{ position: 'absolute', left: CX - CENTER_R, top: CY - CENTER_R }}
+            initial={{ opacity: 0, scale: 0 }}
+            animate={isInView ? { opacity: 1, scale: 1 } : {}}
+            transition={{ type: 'spring', stiffness: 220, damping: 14, delay: 0.1 }}>
+            <Box
+              w={`${CENTER_R * 2}px`} h={`${CENTER_R * 2}px`} borderRadius="full"
+              bg="radial-gradient(circle, rgba(255,107,43,0.25) 0%, rgba(91,127,255,0.15) 100%)"
+              border="2px solid rgba(255,107,43,0.65)"
+              display="flex" flexDir="column" alignItems="center" justifyContent="center"
+              boxShadow="0 0 32px rgba(255,107,43,0.35), 0 0 70px rgba(255,107,43,0.12)">
+              <Text fontSize="xl" lineHeight={1}>⚖️</Text>
+              <Text color="white" fontWeight={800} fontSize="9px" letterSpacing="0.14em" mt="2px">AUDIT</Text>
+              <Text color="rgba(255,107,43,0.7)" fontSize="7px" fontWeight={700} letterSpacing="0.1em">ORACLE</Text>
+            </Box>
+          </motion.div>
+
+          {/* Node cards */}
+          {nodes.map((n, i) => (
+            <motion.div
+              key={n.step}
+              style={{ position: 'absolute', left: n.nx - CARD_W / 2, top: n.ny - CARD_H / 2, width: CARD_W }}
+              initial={{ opacity: 0, scale: 0.7 }}
+              animate={isInView ? { opacity: 1, scale: 1 } : {}}
+              transition={{ type: 'spring', stiffness: 190, damping: 16, delay: 0.8 + i * 0.15 }}>
+              <Box
+                p="11px" borderRadius="14px"
+                bg="rgba(6,6,12,0.85)"
+                border={`1.5px solid ${n.color}38`}
+                boxShadow={`0 0 18px ${n.color}14, 0 4px 16px rgba(0,0,0,0.5)`}
+                backdropFilter="blur(20px)" position="relative" overflow="hidden">
+                <Box position="absolute" top={0} left={0} right={0} h="1.5px"
+                  bg={`linear-gradient(90deg, transparent, ${n.color}80, transparent)`} />
+                <VStack align="start" spacing="5px">
+                  <HStack spacing="6px">
+                    <Text fontSize="md" lineHeight={1}>{n.icon}</Text>
+                    <Text fontSize="8px" color={n.color} fontWeight={800} letterSpacing="0.12em">STEP {n.step}</Text>
+                  </HStack>
+                  <Text color="white" fontWeight={700} fontSize="xs" lineHeight={1.2}>{n.title}</Text>
+                  <Text color="rgba(255,255,255,0.52)" fontSize="9px" lineHeight={1.65}>{n.desc}</Text>
+                </VStack>
+              </Box>
+            </motion.div>
+          ))}
+        </Box>
+      </Box>
+
+      {/* Mobile: vertical timeline */}
+      <motion.div variants={stagger} initial="hidden" whileInView="show" viewport={{ once: true }}>
+        <VStack display={{ base: 'flex', lg: 'none' }} spacing={0} align="stretch">
+          {nodes.map((n, i) => (
+            <MotionBox key={n.step} variants={fadeUp}>
+              <HStack spacing={0} align="stretch">
+                <VStack spacing={0} align="center" w="44px" flexShrink={0} pt={3}>
+                  <Box w="1px" h="12px" bg={i === 0 ? 'transparent' : 'rgba(255,255,255,0.1)'} />
+                  <Box w="32px" h="32px" borderRadius="full"
+                    bg={`${n.color}18`} border={`1.5px solid ${n.color}55`}
+                    display="flex" alignItems="center" justifyContent="center">
+                    <Text fontSize="sm" lineHeight={1}>{n.icon}</Text>
+                  </Box>
+                  <Box w="1px" flex={1} minH="40px" bg={i === nodes.length - 1 ? 'transparent' : 'rgba(255,255,255,0.1)'} />
+                </VStack>
+                <Box flex={1} py={3} pl={3} pb={5}>
+                  <Text fontSize="8px" color={n.color} fontWeight={800} letterSpacing="0.12em" mb="4px">STEP {n.step}</Text>
+                  <Text color="white" fontWeight={700} fontSize="sm" mb={1}>{n.title}</Text>
+                  <Text color="rgba(255,255,255,0.6)" fontSize="xs" lineHeight={1.7}>{n.desc}</Text>
+                </Box>
+              </HStack>
+            </MotionBox>
+          ))}
+        </VStack>
+      </motion.div>
+    </Box>
+  )
+}
 
 export default function LandingPage() {
   const navigate  = useNavigate()
@@ -213,35 +347,6 @@ export default function LandingPage() {
         </Container>
       </Box>
 
-      {/* ── HOW IT WORKS ────────────────────────────────────────────── */}
-      <Container maxW="container.xl" py={24}>
-        <motion.div variants={stagger} initial="hidden" whileInView="show" viewport={{ once: true }}>
-          <VStack spacing={12}>
-            <MotionBox variants={fadeUp} textAlign="center">
-              <Text fontSize="xs" color="#FF9B51" fontWeight={700} letterSpacing="widest" mb={2}>THE PIPELINE</Text>
-              <Text fontSize={{ base: '2xl', md: '4xl' }} fontWeight={900} color="white">How It Works</Text>
-            </MotionBox>
-            <SimpleGrid columns={{ base: 1, md: 2, lg: 4 }} spacing={6} w="full">
-              {HOW_IT_WORKS.map(({ step, icon, title, desc }) => (
-                <MotionBox key={step} variants={fadeUp}>
-                  <Box className="glass card-hover" p={7} borderRadius="20px"
-                    border="1px solid rgba(255,107,43,0.12)" h="full">
-                    <VStack align="start" spacing={3}>
-                      <HStack>
-                        <Text fontSize="2xl">{icon}</Text>
-                        <Text fontSize="xs" color="rgba(255,107,43,0.7)" fontWeight={700} letterSpacing="widest">STEP {step}</Text>
-                      </HStack>
-                      <Text color="white" fontWeight={700} fontSize="lg">{title}</Text>
-                      <Text color="rgba(255,255,255,0.7)" fontSize="sm" lineHeight={1.7}>{desc}</Text>
-                    </VStack>
-                  </Box>
-                </MotionBox>
-              ))}
-            </SimpleGrid>
-          </VStack>
-        </motion.div>
-      </Container>
-
       {/* ── LIGHTNING SHOWCASE ──────────────────────────────────────── */}
       <Box py={24} position="relative" overflow="hidden" borderTop="1px solid rgba(251,191,36,0.1)">
         <Box position="absolute" inset="0" bg="linear-gradient(135deg, rgba(251,191,36,0.07) 0%, rgba(255,107,43,0.04) 50%, rgba(0,0,0,0) 100%)" />
@@ -375,6 +480,20 @@ export default function LandingPage() {
           </SimpleGrid>
         </Container>
       </Box>
+
+      {/* ── HOW IT WORKS MIND MAP ────────────────────────────────────── */}
+      <Container maxW="container.xl" py={24}>
+        <motion.div initial="hidden" whileInView="show" variants={stagger} viewport={{ once: true }}>
+          <VStack spacing={14}>
+            <MotionBox variants={fadeUp} textAlign="center">
+              <Text fontSize="xs" color="#FF9B51" fontWeight={700} letterSpacing="widest" mb={2}>THE PIPELINE</Text>
+              <Text fontSize={{ base: '2xl', md: '4xl' }} fontWeight={900} color="white">How It Works</Text>
+              <Text color="rgba(255,255,255,0.45)" fontSize="sm" mt={2}>Four steps. Zero trust. Real Bitcoin.</Text>
+            </MotionBox>
+            <MindMapFlow />
+          </VStack>
+        </motion.div>
+      </Container>
 
       {/* ── FEATURES ────────────────────────────────────────────────── */}
       <Box bg="rgba(0,0,0,0.2)" py={24} borderTop="1px solid rgba(255,255,255,0.04)">
