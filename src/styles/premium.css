@@ -295,3 +295,148 @@
 }
 .card-glow:hover::before { opacity: 1; }
 .card-glow:hover { transform: translateY(-3px); }
+
+/* ── Marketplace Premium Effects ────────────────────────────────── */
+.marketplace-card {
+  position: relative;
+  overflow: hidden;
+}
+.marketplace-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #FF6B2B, #A78BFA, #22C55E, #FBBF24);
+  background-size: 300% 100%;
+  animation: gradientFlow 4s ease infinite;
+}
+@keyframes gradientFlow {
+  0%   { background-position: 0%   50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0%   50%; }
+}
+
+/* ── PSBT Signing Progress ──────────────────────────────────────── */
+.psbt-node {
+  transition: all 0.3s ease;
+}
+.psbt-node.signed {
+  border-color: rgba(34, 197, 94, 0.4) !important;
+  box-shadow: 0 0 12px rgba(34, 197, 94, 0.2);
+}
+
+/* ── OP_RETURN Chain Link ───────────────────────────────────────── */
+.chain-link {
+  position: relative;
+}
+.chain-link::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 19px;
+  width: 2px; height: 100%;
+  background: linear-gradient(180deg, rgba(34,197,94,0.3), rgba(34,197,94,0.05));
+}
+.chain-link:last-child::before { display: none; }
+
+/* ── FROST Ceremony Glow ───────────────────────────────────────── */
+.ceremony-node {
+  position: relative;
+}
+.ceremony-node::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  background: radial-gradient(circle, currentColor 0%, transparent 70%);
+  opacity: 0.15;
+  animation: ceremonyPulse 2s ease-in-out infinite;
+}
+@keyframes ceremonyPulse {
+  0%, 100% { opacity: 0.1; transform: scale(1); }
+  50%      { opacity: 0.25; transform: scale(1.1); }
+}
+
+/* ── Merkle Tree Node Hover ─────────────────────────────────────── */
+.merkle-node {
+  transition: all 0.2s ease;
+}
+.merkle-node:hover {
+  transform: translateY(-2px) !important;
+}
+.merkle-node.highlighted {
+  box-shadow: 0 0 16px rgba(167, 139, 250, 0.3);
+}
+
+/* ── Premium Stat Counter ───────────────────────────────────────── */
+.stat-premium {
+  position: relative;
+  overflow: hidden;
+}
+.stat-premium::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #FF6B2B, transparent);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.stat-premium:hover::after { opacity: 1; }
+
+/* ── Section Divider Glow ───────────────────────────────────────── */
+.section-divider {
+  height: 1px;
+  background: linear-gradient(90deg,
+    transparent,
+    rgba(255,107,43,0.3) 20%,
+    rgba(167,139,250,0.3) 50%,
+    rgba(255,107,43,0.3) 80%,
+    transparent
+  );
+}
+
+/* ── Floating Particle Effect ───────────────────────────────────── */
+@keyframes floatParticle {
+  0%   { transform: translate(0, 0) rotate(0deg); opacity: 0; }
+  10%  { opacity: 0.6; }
+  90%  { opacity: 0.6; }
+  100% { transform: translate(var(--dx, 50px), var(--dy, -80px)) rotate(360deg); opacity: 0; }
+}
+
+/* ── Bounty Badge Pulse ─────────────────────────────────────────── */
+.bounty-open {
+  animation: bountyPulse 2s ease-in-out infinite;
+}
+@keyframes bountyPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(34,197,94,0.3); }
+  50%      { box-shadow: 0 0 0 6px rgba(34,197,94,0); }
+}
+
+/* ── Premium Input Focus ────────────────────────────────────────── */
+input:focus, .chakra-input:focus {
+  border-color: #FF6B2B !important;
+  box-shadow: 0 0 0 1px rgba(255,107,43,0.3), 0 0 20px rgba(255,107,43,0.15) !important;
+}
+
+/* ── Signature Hash Display ─────────────────────────────────────── */
+.hash-display {
+  background: rgba(0,0,0,0.4);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  color: rgba(255,255,255,0.7);
+  word-break: break-all;
+  line-height: 1.5;
+  position: relative;
+  overflow: hidden;
+}
+.hash-display::after {
+  content: '';
+  position: absolute;
+  top: 0; right: 0; bottom: 0;
+  width: 48px;
+  background: linear-gradient(90deg, transparent, rgba(13,24,41,0.9));
+  pointer-events: none;
+}

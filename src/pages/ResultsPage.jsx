@@ -39,6 +39,8 @@ import { motion } from 'framer-motion'
 import { useState, useEffect, useRef } from 'react'
 import { useAuditStore } from '../store/auditStore'
 import apiClient from '../api/client'
+import FROSTCeremony from '../components/FROSTCeremony'
+import MerkleExplorer from '../components/MerkleExplorer'
 
 const MotionBox = motion(Box)
 const MotionCard = motion(Card)
@@ -58,7 +60,7 @@ function RiskGauge({ score, size = 160 }) {
     return () => clearTimeout(timer)
   }, [score])
 
-  const color = score > 70 ? '#EF4444' : score > 40 ? '#FBBF24' : '#22C55E'
+  const color = score > 70 ? '#FCA5A5' : score > 40 ? '#FBBF24' : '#22C55E'
   const label = score > 70 ? 'CRITICAL' : score > 40 ? 'ELEVATED' : 'LOW'
 
   return (
@@ -111,6 +113,7 @@ export default function ResultsPage() {
   const satelliteData = useAuditStore((s) => s.satelliteData)
   const merkleTree = useAuditStore((s) => s.merkleTree)
   const tapscriptInfo = useAuditStore((s) => s.tapscriptInfo)
+  const lightningInvoice = useAuditStore((s) => s.lightningInvoice)
 
   const [sigVerified, setSigVerified] = useState(null) // null | 'loading' | { valid, ... }
   const [testnetInfo, setTestnetInfo] = useState(null)
@@ -179,7 +182,7 @@ export default function ResultsPage() {
                 variants={fadeUp}
                 className="glass"
                 borderLeft="6px solid"
-                borderLeftColor={verdict?.winner ? '#22C55E' : '#EF4444'}
+                borderLeftColor={verdict?.winner ? '#22C55E' : '#FCA5A5'}
               >
                 <CardBody>
                   <HStack justify="space-between" align="center" flexWrap="wrap" gap={4}>
@@ -190,7 +193,7 @@ export default function ResultsPage() {
                         </Heading>
                         <Badge
                           bg={riskLevel === 'CRITICAL' || riskLevel === 'HIGH' ? 'rgba(239,68,68,0.15)' : riskLevel === 'MEDIUM' ? 'rgba(251,191,36,0.15)' : 'rgba(34,197,94,0.15)'}
-                          color={riskLevel === 'CRITICAL' || riskLevel === 'HIGH' ? '#EF4444' : riskLevel === 'MEDIUM' ? '#FBBF24' : '#22C55E'}
+                          color={riskLevel === 'CRITICAL' || riskLevel === 'HIGH' ? '#FCA5A5' : riskLevel === 'MEDIUM' ? '#FBBF24' : '#22C55E'}
                           fontSize="sm" px={3} py={1} borderRadius="full">
                           {riskLevel} RISK
                         </Badge>
@@ -207,11 +210,11 @@ export default function ResultsPage() {
                           { label: 'NASA', icon: '🛰️', ok: !!satelliteData?.fetched },
                           { label: 'Groq AI', icon: '🤖', ok: true },
                           { label: 'FROST', icon: '🔐', ok: !!frostSignature },
-                          { label: 'Merkle', icon: '🌳', ok: !!merkleTree },
+                          { label: 'Lightning', icon: '⚡', ok: !!lightningInvoice },
                         ].map(({ label, icon, ok }) => (
                           <Badge key={label}
                             bg={ok ? 'rgba(34,197,94,0.08)' : 'rgba(239,68,68,0.08)'}
-                            color={ok ? '#22C55E' : '#EF4444'}
+                            color={ok ? '#22C55E' : '#FCA5A5'}
                             border="1px solid"
                             borderColor={ok ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)'}
                             fontSize="2xs" borderRadius="full" px={2} py={0.5}>
@@ -230,7 +233,7 @@ export default function ResultsPage() {
                 <SimpleGrid columns={{ base: 2, md: 4 }} spacing={3}>
                   {[
                     { label: 'Company', value: claim?.company, color: '#FF6B2B' },
-                    { label: 'Contradictions', value: verdict?.contradictions ?? 0, color: (verdict?.contradictions ?? 0) > 0 ? '#EF4444' : '#22C55E' },
+                    { label: 'Contradictions', value: verdict?.contradictions ?? 0, color: (verdict?.contradictions ?? 0) > 0 ? '#FCA5A5' : '#22C55E' },
                     { label: 'Claimed vs Actual', value: `${verdict?.claimedRenewable ?? '--'}% vs ${verdict?.actualRenewable ?? '--'}%`, color: '#FF6B2B' },
                     { label: 'Confidence', value: `${verdict?.confidence ?? 0}%`, color: '#5B7FFF' },
                   ].map(({ label, value, color }) => (
@@ -245,6 +248,95 @@ export default function ResultsPage() {
                   ))}
                 </SimpleGrid>
               </MotionBox>
+
+              {/* ⚡ Lightning Investigator Payment */}
+              {lightningInvoice && (
+                <MotionCard
+                  variants={fadeUp}
+                  className="glass"
+                  borderLeft="4px solid #FBBF24"
+                  border="1px solid rgba(251,191,36,0.25)"
+                  bg="rgba(251,191,36,0.04)"
+                >
+                  <CardBody>
+                    <VStack align="start" spacing={4}>
+                      <HStack justify="space-between" w="full" flexWrap="wrap" gap={3}>
+                        <VStack align="start" spacing={0}>
+                          <HStack spacing={2}>
+                            <Text fontSize="lg">⚡</Text>
+                            <Heading as="h3" size="sm" color="white" fontFamily="heading">Investigator Payment</Heading>
+                            {lightningInvoice.demo ? (
+                              <Badge bg="rgba(251,191,36,0.15)" color="#FBBF24" fontSize="2xs" borderRadius="full" px={2}>DEMO</Badge>
+                            ) : (
+                              <Badge bg="rgba(34,197,94,0.15)" color="#22C55E" fontSize="2xs" borderRadius="full" px={2}>LIVE</Badge>
+                            )}
+                          </HStack>
+                          <Text fontSize="2xs" color="rgba(255,255,255,0.45)" maxW="400px">
+                            Bitcoin Lightning payment. Instant. No bank. No intermediary. Any Lightning wallet can pay this.
+                          </Text>
+                        </VStack>
+                        <VStack align="end" spacing={0}>
+                          <Text fontSize="2xl" fontWeight={900} color="#FBBF24">{lightningInvoice.amount?.toLocaleString() ?? 1000}</Text>
+                          <Text fontSize="2xs" color="rgba(255,255,255,0.5)">sats (testnet)</Text>
+                        </VStack>
+                      </HStack>
+
+                      <Box w="full">
+                        <Text fontSize="2xs" color="rgba(255,255,255,0.55)" mb={1}>
+                          BOLT11 Invoice <Text as="span" color="rgba(255,255,255,0.35)">— scannable by any Lightning wallet</Text>
+                        </Text>
+                        <HStack spacing={2}>
+                          <Box
+                            flex={1} p={3}
+                            bg="rgba(0,0,0,0.35)" border="1px solid rgba(251,191,36,0.2)"
+                            borderRadius="md" fontFamily="mono" fontSize="2xs"
+                            color="rgba(255,255,255,0.8)" overflowX="auto" wordBreak="break-all"
+                          >
+                            {lightningInvoice.paymentRequest}
+                          </Box>
+                          <Button
+                            size="sm"
+                            leftIcon={<CopyIcon />}
+                            bg="rgba(251,191,36,0.15)" color="#FBBF24"
+                            border="1px solid rgba(251,191,36,0.3)"
+                            _hover={{ bg: 'rgba(251,191,36,0.25)' }}
+                            onClick={() => {
+                              navigator.clipboard.writeText(lightningInvoice.paymentRequest)
+                              toast({ title: '⚡ Invoice copied!', description: 'Paste into any Lightning wallet', status: 'success', duration: 3, isClosable: true })
+                            }}
+                          >
+                            Copy
+                          </Button>
+                        </HStack>
+                      </Box>
+
+                      <Box p={3} bg="rgba(251,191,36,0.06)" borderRadius="md" border="1px solid rgba(251,191,36,0.12)" w="full">
+                        <Text fontSize="2xs" color="rgba(255,255,255,0.55)">
+                          <Text as="span" color="#FBBF24" fontWeight={600}>Why Lightning? </Text>
+                          Traditional payment processors need bank accounts and days to settle. Lightning is Bitcoin's Layer 2 — it settles in milliseconds, works for anyone on Earth, and requires no intermediary. This is why Bitcoin is essential here.
+                        </Text>
+                      </Box>
+
+                      <HStack spacing={3} flexWrap="wrap">
+                        <Badge bg="rgba(251,191,36,0.1)" color="#FBBF24" fontSize="2xs" borderRadius="full" px={2}>
+                          ⚡ Settles in &lt;1 second
+                        </Badge>
+                        <Badge bg="rgba(34,197,94,0.1)" color="#22C55E" fontSize="2xs" borderRadius="full" px={2}>
+                          🌍 Works globally
+                        </Badge>
+                        <Badge bg="rgba(167,139,250,0.1)" color="#A78BFA" fontSize="2xs" borderRadius="full" px={2}>
+                          🔒 No KYC required
+                        </Badge>
+                        {!lightningInvoice.demo && (
+                          <Badge bg="rgba(91,127,255,0.1)" color="#5B7FFF" fontSize="2xs" borderRadius="full" px={2}>
+                            ✓ Real LNbits invoice
+                          </Badge>
+                        )}
+                      </HStack>
+                    </VStack>
+                  </CardBody>
+                </MotionCard>
+              )}
 
               {/* Charts */}
               <MotionBox variants={fadeUp}>
@@ -269,7 +361,7 @@ export default function ResultsPage() {
                             <Tooltip contentStyle={{ background: '#0D1829', border: '1px solid rgba(255,107,43,0.3)', borderRadius: 8 }} formatter={(v) => `${v}%`} />
                             <Bar dataKey="value" radius={[6, 6, 0, 0]} maxBarSize={56}>
                               <Cell fill="#FF6B2B" />
-                              <Cell fill={verdict?.winner ? '#22C55E' : '#EF4444'} />
+                              <Cell fill={verdict?.winner ? '#22C55E' : '#FCA5A5'} />
                             </Bar>
                           </BarChart>
                         </ResponsiveContainer>
@@ -348,10 +440,15 @@ export default function ResultsPage() {
                   <CardBody>
                     <VStack align="start" spacing={3}>
                       <HStack justify="space-between" w="full">
-                        <Heading as="h3" size="sm" color="white" fontFamily="heading">SEC EDGAR Filing</Heading>
+                        <VStack align="start" spacing={0}>
+                          <Heading as="h3" size="sm" color="white" fontFamily="heading">SEC EDGAR Filing</Heading>
+                          <Text fontSize="2xs" color="rgba(255,255,255,0.45)">
+                            Official documents the company filed with the U.S. Securities and Exchange Commission — checked for ESG claims.
+                          </Text>
+                        </VStack>
                         <Badge
                           bg={secData.disclosureRisk === 'HIGH' ? 'rgba(239,68,68,0.15)' : 'rgba(251,191,36,0.15)'}
-                          color={secData.disclosureRisk === 'HIGH' ? '#EF4444' : '#FBBF24'}
+                          color={secData.disclosureRisk === 'HIGH' ? '#FCA5A5' : '#FBBF24'}
                           fontSize="xs" borderRadius="full" px={3}>
                           Disclosure Risk: {secData.disclosureRisk}
                         </Badge>
@@ -391,7 +488,7 @@ export default function ResultsPage() {
                           <Text fontSize="2xs" color="rgba(255,255,255,0.55)">Solar Rating</Text>
                           <Text fontSize="lg" fontWeight={800} color={
                             satelliteData.solar?.rating === 'EXCELLENT' ? '#22C55E' :
-                            satelliteData.solar?.rating === 'GOOD' ? '#FBBF24' : '#EF4444'
+                            satelliteData.solar?.rating === 'GOOD' ? '#FBBF24' : '#FCA5A5'
                           }>{satelliteData.solar?.rating ?? '--'}</Text>
                           <Text fontSize="2xs" color="rgba(255,255,255,0.45)">Potential</Text>
                         </Box>
@@ -404,7 +501,7 @@ export default function ResultsPage() {
                           <Text fontSize="2xs" color="rgba(255,255,255,0.55)">Wind Rating</Text>
                           <Text fontSize="lg" fontWeight={800} color={
                             satelliteData.wind?.rating === 'EXCELLENT' ? '#22C55E' :
-                            satelliteData.wind?.rating === 'GOOD' ? '#FBBF24' : '#EF4444'
+                            satelliteData.wind?.rating === 'GOOD' ? '#FBBF24' : '#FCA5A5'
                           }>{satelliteData.wind?.rating ?? '--'}</Text>
                           <Text fontSize="2xs" color="rgba(255,255,255,0.45)">Potential</Text>
                         </Box>
@@ -423,10 +520,15 @@ export default function ResultsPage() {
                   <CardBody>
                     <VStack align="start" spacing={4}>
                       <HStack justify="space-between" w="full" flexWrap="wrap">
-                        <Heading as="h3" size="sm" color="white" fontFamily="heading">FROST Oracle Consensus</Heading>
+                        <VStack align="start" spacing={0}>
+                          <Heading as="h3" size="sm" color="white" fontFamily="heading">FROST Oracle Consensus</Heading>
+                          <Text fontSize="2xs" color="rgba(255,255,255,0.45)" maxW="400px">
+                            3 independent nodes analyzed the company. At least 2 must agree for the result to be valid — no single node can fake the outcome.
+                          </Text>
+                        </VStack>
                         <Badge
                           bg={oracleResults.consensus.fraudDetected ? 'rgba(239,68,68,0.15)' : 'rgba(34,197,94,0.15)'}
-                          color={oracleResults.consensus.fraudDetected ? '#EF4444' : '#22C55E'}
+                          color={oracleResults.consensus.fraudDetected ? '#FCA5A5' : '#22C55E'}
                           fontSize="xs" borderRadius="full" px={3}>
                           {oracleResults.consensus.fraudVotes}/3 — {oracleResults.consensus.fraudDetected ? 'FRAUD CONSENSUS' : 'CLEAN'}
                         </Badge>
@@ -435,17 +537,27 @@ export default function ResultsPage() {
                         {oracleResults.nodes?.map(n => (
                           <Box key={n.id} p={3} bg="rgba(0,0,0,0.3)" borderRadius="lg" border="1px solid rgba(255,255,255,0.06)" textAlign="center">
                             <Text fontSize="2xs" color="rgba(255,255,255,0.55)">Oracle Node {n.id}</Text>
-                            <Text fontSize="xl" fontWeight={800} color={n.fraud ? '#EF4444' : '#22C55E'}>{n.risk}</Text>
-                            <Badge bg={n.fraud ? 'rgba(239,68,68,0.15)' : 'rgba(34,197,94,0.15)'} color={n.fraud ? '#EF4444' : '#22C55E'} fontSize="2xs" borderRadius="full">{n.level}</Badge>
+                            <Text fontSize="xl" fontWeight={800} color={n.fraud ? '#FCA5A5' : '#22C55E'}>{n.risk}</Text>
+                            <Badge bg={n.fraud ? 'rgba(239,68,68,0.15)' : 'rgba(34,197,94,0.15)'} color={n.fraud ? '#FCA5A5' : '#22C55E'} fontSize="2xs" borderRadius="full">{n.level}</Badge>
                           </Box>
                         ))}
                       </SimpleGrid>
-                      <Text fontSize="xs" color="rgba(255,255,255,0.55)">
-                        Scheme: FROST 2-of-3 Schnorr Threshold · Shamir's Secret Sharing + Lagrange Interpolation
-                      </Text>
+                      <Box p={2} bg="rgba(167,139,250,0.06)" borderRadius="md" border="1px solid rgba(167,139,250,0.1)" w="full">
+                        <Text fontSize="2xs" color="rgba(255,255,255,0.55)">
+                          <Text as="span" color="#A78BFA" fontWeight={600}>How it works: </Text>
+                          The secret signing key is split into 3 pieces (one per node) using Shamir's Secret Sharing — like tearing a password into 3 parts. Any 2 parts can reconstruct it, but 1 alone is useless. This prevents any single party from forging results.
+                        </Text>
+                      </Box>
                     </VStack>
                   </CardBody>
                 </MotionCard>
+              )}
+
+              {/* FROST Ceremony Visualization */}
+              {frostSignature && (
+                <MotionBox variants={fadeUp}>
+                  <FROSTCeremony frostSignature={frostSignature} oracleResults={oracleResults} />
+                </MotionBox>
               )}
 
               {/* Bitcoin Taproot Proof */}
@@ -454,9 +566,14 @@ export default function ResultsPage() {
                   <CardBody>
                     <VStack align="start" spacing={4}>
                       <HStack justify="space-between" w="full" flexWrap="wrap">
-                        <Heading as="h3" size="md" color="white" fontFamily="heading">
-                          Bitcoin Taproot Proof
-                        </Heading>
+                        <VStack align="start" spacing={0}>
+                          <Heading as="h3" size="md" color="white" fontFamily="heading">
+                            Bitcoin Taproot Proof
+                          </Heading>
+                          <Text fontSize="2xs" color="rgba(255,255,255,0.45)" maxW="400px">
+                            The audit verdict is permanently recorded on the Bitcoin blockchain — it can never be changed or deleted by anyone.
+                          </Text>
+                        </VStack>
                         {sigVerified === 'loading' ? (
                           <HStack spacing={2}>
                             <Spinner size="xs" color="#A78BFA" />
@@ -471,14 +588,17 @@ export default function ResultsPage() {
 
                       {frostSignature && (
                         <Box w="full">
-                          <Text fontSize="xs" color="#A78BFA" fontWeight={700} mb={2}>FROST Schnorr Signature (BIP-340)</Text>
+                          <Text fontSize="xs" color="#A78BFA" fontWeight={700} mb={1}>FROST Schnorr Signature (BIP-340)</Text>
+                          <Text fontSize="2xs" color="rgba(255,255,255,0.4)" mb={2}>
+                            A digital fingerprint proving that at least 2 oracle nodes approved this verdict. Like a tamper-proof seal.
+                          </Text>
                           <SimpleGrid columns={{ base: 1, md: 2 }} spacing={2}>
                             <Box p={2} bg="rgba(0,0,0,0.3)" borderRadius="md" border="1px solid rgba(167,139,250,0.15)">
-                              <Text fontSize="2xs" color="rgba(255,255,255,0.55)">R (Nonce Point)</Text>
+                              <Text fontSize="2xs" color="rgba(255,255,255,0.55)">R (Nonce Point) <Text as="span" color="rgba(255,255,255,0.35)">— random lock</Text></Text>
                               <Text fontSize="2xs" fontFamily="mono" color="rgba(255,255,255,0.8)" wordBreak="break-all">{frostSignature.R}</Text>
                             </Box>
                             <Box p={2} bg="rgba(0,0,0,0.3)" borderRadius="md" border="1px solid rgba(167,139,250,0.15)">
-                              <Text fontSize="2xs" color="rgba(255,255,255,0.55)">s (Aggregated Scalar)</Text>
+                              <Text fontSize="2xs" color="rgba(255,255,255,0.55)">s (Aggregated Scalar) <Text as="span" color="rgba(255,255,255,0.35)">— combined key</Text></Text>
                               <Text fontSize="2xs" fontFamily="mono" color="rgba(255,255,255,0.8)" wordBreak="break-all">{frostSignature.s}</Text>
                             </Box>
                           </SimpleGrid>
@@ -497,14 +617,17 @@ export default function ResultsPage() {
 
                       {bitcoinTx && (
                         <Box w="full">
-                          <Text fontSize="xs" color="#FF9B51" fontWeight={700} mb={2}>Taproot Transaction (BIP-341)</Text>
+                          <Text fontSize="xs" color="#FF9B51" fontWeight={700} mb={1}>Taproot Transaction (BIP-341)</Text>
+                          <Text fontSize="2xs" color="rgba(255,255,255,0.4)" mb={2}>
+                            An actual Bitcoin transaction that stores the verdict. Taproot is Bitcoin's latest upgrade for privacy and smart contracts.
+                          </Text>
                           <SimpleGrid columns={{ base: 1, md: 2 }} spacing={2}>
                             <Box p={2} bg="rgba(0,0,0,0.3)" borderRadius="md" border="1px solid rgba(255,107,43,0.15)">
-                              <Text fontSize="2xs" color="rgba(255,255,255,0.55)">TxID</Text>
+                              <Text fontSize="2xs" color="rgba(255,255,255,0.55)">TxID <Text as="span" color="rgba(255,255,255,0.35)">— unique receipt number</Text></Text>
                               <Text fontSize="2xs" fontFamily="mono" color="#FF9B51" wordBreak="break-all">{bitcoinTx.txId}</Text>
                             </Box>
                             <Box p={2} bg="rgba(0,0,0,0.3)" borderRadius="md" border="1px solid rgba(255,107,43,0.15)">
-                              <Text fontSize="2xs" color="rgba(255,255,255,0.55)">OP_RETURN Inscription</Text>
+                              <Text fontSize="2xs" color="rgba(255,255,255,0.55)">OP_RETURN <Text as="span" color="rgba(255,255,255,0.35)">— verdict text stored on Bitcoin</Text></Text>
                               <Text fontSize="2xs" fontFamily="mono" color="rgba(255,255,255,0.8)">{bitcoinTx.opReturn}</Text>
                             </Box>
                           </SimpleGrid>
@@ -536,7 +659,7 @@ export default function ResultsPage() {
                                 </Badge>
                               </HStack>
                               <Text fontSize="2xs" color="rgba(255,255,255,0.55)">
-                                On-chain TXs: {testnetInfo.chain_stats?.tx_count ?? 0} · Mempool TXs: {testnetInfo.mempool_stats?.tx_count ?? 0}
+                                On-chain TXs: {testnetInfo.chain_stats?.tx_count ?? 0} <Text as="span" color="rgba(255,255,255,0.35)">(confirmed)</Text> · Mempool TXs: {testnetInfo.mempool_stats?.tx_count ?? 0} <Text as="span" color="rgba(255,255,255,0.35)">(waiting)</Text>
                               </Text>
                             </VStack>
                             <Text as="a" href={testnetInfo.explorerUrl} target="_blank" rel="noopener noreferrer"
@@ -549,7 +672,7 @@ export default function ResultsPage() {
 
                       {groupPubKey && (
                         <Text fontSize="2xs" color="rgba(255,255,255,0.45)">
-                          FROST Group Key: {groupPubKey.slice(0, 24)}... · BIP-340 x-only
+                          FROST Group Key: {groupPubKey.slice(0, 24)}... · BIP-340 x-only — the shared public key all 3 nodes created together
                         </Text>
                       )}
                     </VStack>
@@ -561,9 +684,14 @@ export default function ResultsPage() {
               <MotionCard variants={fadeUp} className="glass" borderTop="3px solid #FF6B2B">
                 <CardBody>
                   <VStack align="start" spacing={4}>
-                    <Heading as="h3" size="md" color="white" fontFamily="heading">
-                      Immutable Nostr Proof
-                    </Heading>
+                    <VStack align="start" spacing={1}>
+                      <Heading as="h3" size="md" color="white" fontFamily="heading">
+                        Immutable Nostr Proof
+                      </Heading>
+                      <Text fontSize="2xs" color="rgba(255,255,255,0.45)">
+                        Nostr is a censorship-resistant social network. This verdict is published there so anyone can verify it — no company can take it down.
+                      </Text>
+                    </VStack>
                     <HStack w="full" spacing={2}>
                       <Box flex={1} p={3}
                         bg="rgba(0,0,0,0.3)" border="1px solid rgba(255,255,255,0.08)"
@@ -580,47 +708,21 @@ export default function ResultsPage() {
                     <Text fontSize="xs" color="rgba(255,255,255,0.5)">
                       Published to relay.damus.io, nos.lol, relay.nostr.band. Cryptographically signed — cannot be censored or deleted.
                     </Text>
+                    <Box p={2} bg="rgba(255,107,43,0.06)" borderRadius="md" border="1px solid rgba(255,107,43,0.1)" w="full">
+                      <Text fontSize="2xs" color="rgba(255,255,255,0.5)">
+                        <Text as="span" color="#FF9B51" fontWeight={600}>What is a Note ID? </Text>
+                        It's like a permanent web link to this verdict on the Nostr network. Anyone can paste this ID into a Nostr client to see the audit proof.
+                      </Text>
+                    </Box>
                   </VStack>
                 </CardBody>
               </MotionCard>
 
-              {/* Merkle Proof */}
+              {/* Interactive Merkle Explorer */}
               {merkleTree && (
-                <MotionCard variants={fadeUp} className="glass" borderLeft="4px solid #22C55E">
-                  <CardBody>
-                    <VStack align="start" spacing={3}>
-                      <HStack justify="space-between" w="full" flexWrap="wrap">
-                        <Heading as="h3" size="sm" color="white" fontFamily="heading">
-                          🌳 Merkle Integrity Proof
-                        </Heading>
-                        <Badge bg="rgba(34,197,94,0.15)" color="#22C55E" fontSize="xs" borderRadius="full" px={3}>
-                          SHA-256 · Depth {merkleTree.depth}
-                        </Badge>
-                      </HStack>
-                      <Box w="full" p={3} bg="rgba(0,0,0,0.3)" borderRadius="md" border="1px solid rgba(34,197,94,0.15)">
-                        <Text fontSize="2xs" color="rgba(255,255,255,0.55)" mb={1}>Merkle Root</Text>
-                        <Text fontSize="2xs" fontFamily="mono" color="#22C55E" wordBreak="break-all">{merkleTree.root}</Text>
-                      </Box>
-                      <SimpleGrid columns={{ base: 2, md: 3 }} spacing={2} w="full">
-                        <Box p={2} bg="rgba(0,0,0,0.2)" borderRadius="md" textAlign="center">
-                          <Text fontSize="2xs" color="rgba(255,255,255,0.55)">Leaves</Text>
-                          <Text fontSize="md" fontWeight={800} color="white">{merkleTree.leafCount}</Text>
-                        </Box>
-                        <Box p={2} bg="rgba(0,0,0,0.2)" borderRadius="md" textAlign="center">
-                          <Text fontSize="2xs" color="rgba(255,255,255,0.55)">Depth</Text>
-                          <Text fontSize="md" fontWeight={800} color="white">{merkleTree.depth}</Text>
-                        </Box>
-                        <Box p={2} bg="rgba(0,0,0,0.2)" borderRadius="md" textAlign="center">
-                          <Text fontSize="2xs" color="rgba(255,255,255,0.55)">Algorithm</Text>
-                          <Text fontSize="md" fontWeight={800} color="white">SHA-256</Text>
-                        </Box>
-                      </SimpleGrid>
-                      <Text fontSize="2xs" color="rgba(255,255,255,0.45)">
-                        Merkle tree commits all verdict data into a single root hash — tamper-evident integrity proof
-                      </Text>
-                    </VStack>
-                  </CardBody>
-                </MotionCard>
+                <MotionBox variants={fadeUp}>
+                  <MerkleExplorer merkleTree={merkleTree} />
+                </MotionBox>
               )}
 
               {/* Tapscript Spending Paths */}
@@ -629,15 +731,20 @@ export default function ResultsPage() {
                   <CardBody>
                     <VStack align="start" spacing={3}>
                       <HStack justify="space-between" w="full" flexWrap="wrap">
-                        <Heading as="h3" size="sm" color="white" fontFamily="heading">
-                          Tapscript Spending Paths (BIP-342)
-                        </Heading>
+                        <VStack align="start" spacing={0}>
+                          <Heading as="h3" size="sm" color="white" fontFamily="heading">
+                            Tapscript Spending Paths (BIP-342)
+                          </Heading>
+                          <Text fontSize="2xs" color="rgba(255,255,255,0.45)" maxW="400px">
+                            Rules for how the escrowed funds can be spent — like conditions on a safe. Each path is a different way to unlock the money.
+                          </Text>
+                        </VStack>
                         <Badge bg="rgba(245,158,11,0.15)" color="#F59E0B" fontSize="xs" borderRadius="full" px={3}>
                           {tapscriptInfo.scripts?.length || 0} Scripts
                         </Badge>
                       </HStack>
                       <Box w="full" p={3} bg="rgba(0,0,0,0.3)" borderRadius="md" border="1px solid rgba(245,158,11,0.15)">
-                        <Text fontSize="2xs" color="rgba(255,255,255,0.55)" mb={1}>Script-Path Address</Text>
+                        <Text fontSize="2xs" color="rgba(255,255,255,0.55)" mb={1}>Script-Path Address <Text as="span" color="rgba(255,255,255,0.35)">— the smart contract address on Bitcoin</Text></Text>
                         <Text fontSize="2xs" fontFamily="mono" color="#F59E0B" wordBreak="break-all">{tapscriptInfo.address}</Text>
                       </Box>
                       <VStack spacing={2} w="full">
@@ -656,7 +763,7 @@ export default function ResultsPage() {
                         ))}
                       </VStack>
                       <Text fontSize="2xs" color="rgba(255,255,255,0.45)">
-                        Script Root: {tapscriptInfo.scriptRoot?.slice(0, 32)}...
+                        Script Root: {tapscriptInfo.scriptRoot?.slice(0, 32)}... — a fingerprint of all the spending rules combined
                       </Text>
                     </VStack>
                   </CardBody>
@@ -680,7 +787,7 @@ export default function ResultsPage() {
                     View on Nostr
                   </Button>
                   <Button variant="outline" size="sm"
-                    borderColor="rgba(239,68,68,0.4)" color="#EF4444"
+                    borderColor="rgba(239,68,68,0.4)" color="#FCA5A5"
                     _hover={{ bg: 'rgba(239,68,68,0.08)' }}
                     onClick={handleSaveLeaderboard}>
                     Hall of Shame

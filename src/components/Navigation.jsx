@@ -67,6 +67,7 @@ export default function Navigation() {
           {/* Nav links */}
           <HStack spacing={1}>
             <NavLink to="/">Home</NavLink>
+            <NavLink to="/marketplace">Bounties</NavLink>
             <NavLink to="/leaderboard">Hall of Shame</NavLink>
             {claim && <NavLink to="/results">Results</NavLink>}
           </HStack>

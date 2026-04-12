@@ -25,6 +25,15 @@ const useAuditStore = create((set, get) => ({
   merkleTree: null,       // { root, depth, leafCount, leaves }
   tapscriptInfo: null,    // { address, scriptRoot, scripts }
 
+  // Bounty marketplace state
+  bountyWallet: null,       // { address, balance, funded }
+  activeBounties: [],       // marketplace bounties
+  currentBounty: null,      // active bounty being investigated
+  psbtState: null,          // { id, status, signatures, requiredSignatures }
+  opReturnChain: [],        // recursive verdict chain
+  ceremonyState: null,      // FROST ceremony visualization data
+  lightningInvoice: null,   // { paymentRequest, paymentHash, amount, memo, company, demo }
+
   // Claim kicks off the audit pipeline
   setClaim: (claim) => set({
     claim,
@@ -55,6 +64,13 @@ const useAuditStore = create((set, get) => ({
     satelliteData: null,
     merkleTree: null,
     tapscriptInfo: null,
+    bountyWallet: null,
+    activeBounties: [],
+    currentBounty: null,
+    psbtState: null,
+    opReturnChain: [],
+    ceremonyState: null,
+    lightningInvoice: null,
   }),
 
   // Update claim data mid-pipeline without resetting phase
@@ -97,6 +113,15 @@ const useAuditStore = create((set, get) => ({
   setMerkleTree: (merkleTree) => set({ merkleTree }),
   setTapscriptInfo: (tapscriptInfo) => set({ tapscriptInfo }),
 
+  // Bounty marketplace setters
+  setBountyWallet: (bountyWallet) => set({ bountyWallet }),
+  setActiveBounties: (activeBounties) => set({ activeBounties }),
+  setCurrentBounty: (currentBounty) => set({ currentBounty }),
+  setPsbtState: (psbtState) => set({ psbtState }),
+  setOpReturnChain: (opReturnChain) => set({ opReturnChain }),
+  setCeremonyState: (ceremonyState) => set({ ceremonyState }),
+  setLightningInvoice: (lightningInvoice) => set({ lightningInvoice }),
+
   resetAudit: () => set({
     claim: null,
     targetCompany: '',
@@ -118,7 +143,12 @@ const useAuditStore = create((set, get) => ({
     satelliteData: null,
     merkleTree: null,
     tapscriptInfo: null,
-  }),
+    bountyWallet: null,
+    activeBounties: [],
+    currentBounty: null,
+    psbtState: null,
+    opReturnChain: [],
+    ceremonyState: null,    lightningInvoice: null,  }),
 }))
 
 export { useAuditStore }

@@ -30,6 +30,7 @@ export default function AuditFlowPage() {
   const setSatelliteData = useAuditStore((s) => s.setSatelliteData)
   const setMerkleTree = useAuditStore((s) => s.setMerkleTree)
   const setTapscriptInfo = useAuditStore((s) => s.setTapscriptInfo)
+  const setLightningInvoice = useAuditStore((s) => s.setLightningInvoice)
   const setError = useAuditStore((s) => s.setError)
 
   const [nodeLogs, setNodeLogs] = useState({ 1: [], 2: [], 3: [] })
@@ -170,7 +171,24 @@ export default function AuditFlowPage() {
       const updated = [entry, ...existing.filter(x => x.company !== targetCompany)].slice(0, 20)
       localStorage.setItem('veridion_leaderboard', JSON.stringify(updated))
 
-      setTimeout(() => navigate('/results'), 1800)
+      // Create Lightning invoice for investigator payment
+      ;(async () => {
+        try {
+          const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
+          const resp = await fetch(`${apiUrl}/lightning/create-invoice`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ company: targetCompany, amount: 1000 }),
+          })
+          if (resp.ok) {
+            const invoice = await resp.json()
+            setLightningInvoice(invoice)
+          }
+        } catch {
+          // Non-fatal — audit is still complete without Lightning
+        }
+      })()
+
     })
 
     source.addEventListener('error', (e) => {
@@ -215,7 +233,7 @@ export default function AuditFlowPage() {
     CONSENSUS: '#22C55E',
     SIGNING: '#A78BFA',
     COMPLETE: '#22C55E',
-    ERROR: '#EF4444',
+    ERROR: '#FCA5A5',
   }
 
   const PHASES = ['CONNECTING', 'RUNNING', 'CONSENSUS', 'SIGNING', 'COMPLETE']
@@ -247,7 +265,7 @@ export default function AuditFlowPage() {
                   </VStack>
                   <VStack align="end" spacing={0}>
                     {phase === 'ERROR' ? (
-                      <Button size="sm" bg="rgba(239,68,68,0.15)" color="#EF4444" border="1px solid rgba(239,68,68,0.3)" borderRadius="full" onClick={handleRetry} _hover={{ bg: 'rgba(239,68,68,0.25)' }}>
+                      <Button size="sm" bg="rgba(239,68,68,0.15)" color="#FCA5A5" border="1px solid rgba(239,68,68,0.3)" borderRadius="full" onClick={handleRetry} _hover={{ bg: 'rgba(239,68,68,0.25)' }}>
                         Retry Oracle
                       </Button>
                     ) : (
@@ -297,10 +315,10 @@ export default function AuditFlowPage() {
           {oracleInit && (
             <SimpleGrid columns={{ base: 2, md: 4 }} spacing={3}>
               {[
-                { label: 'Scheme', value: 'FROST', sub: 'Schnorr Threshold' },
-                { label: 'Threshold', value: '2-of-3', sub: 'Byzantine fault tolerant' },
-                { label: 'Group Key', value: oracleInit.groupPubKey?.slice(0,12) + '...', sub: 'BIP-340 x-only' },
-                { label: 'Satellite', value: 'NASA', sub: 'POWER CERES/MERRA-2' },
+                { label: 'Scheme', value: 'FROST', sub: 'Multi-party signing protocol' },
+                { label: 'Threshold', value: '2-of-3', sub: '2 out of 3 nodes must agree' },
+                { label: 'Group Key', value: oracleInit.groupPubKey?.slice(0,12) + '...', sub: 'Shared public key' },
+                { label: 'Satellite', value: 'NASA', sub: 'Real solar & wind data' },
               ].map(({ label, value, sub }) => (
                 <Box key={label} className="glass" p={3} borderRadius="lg" border="1px solid rgba(255,255,255,0.06)">
                   <Text fontSize="2xs" color="rgba(255,255,255,0.5)" textTransform="uppercase" letterSpacing="0.08em">{label}</Text>
@@ -313,12 +331,15 @@ export default function AuditFlowPage() {
 
           {/* 3 Oracle Terminal Panels */}
           <Box>
-            <HStack mb={3} spacing={2}>
+            <HStack mb={1} spacing={2}>
               <Text fontSize="xs" color="rgba(255,255,255,0.55)" textTransform="uppercase" letterSpacing="0.1em" fontWeight={700}>
                 Oracle Nodes
               </Text>
               <Box flex={1} h="1px" bg="rgba(255,255,255,0.06)" />
             </HStack>
+            <Text fontSize="2xs" color="rgba(255,255,255,0.35)" mb={3}>
+              Each node independently analyzes the company using EIA, EPA, SEC, and NASA data — then they vote on whether greenwashing was detected.
+            </Text>
             <SimpleGrid columns={{ base: 1, md: 3 }} spacing={4}>
               <OracleTerminal nodeId={1} logs={nodeLogs[1]} status={nodeStatus[1]} />
               <OracleTerminal nodeId={2} logs={nodeLogs[2]} status={nodeStatus[2]} />
@@ -335,20 +356,23 @@ export default function AuditFlowPage() {
                     <VStack align="start" spacing={1}>
                       <HStack spacing={2}>
                         <Text fontSize="xs" color="rgba(255,255,255,0.55)" textTransform="uppercase" letterSpacing="0.1em">Consensus</Text>
-                        <Badge bg={consensus.fraudDetected ? 'rgba(239,68,68,0.15)' : 'rgba(34,197,94,0.15)'} color={consensus.fraudDetected ? '#EF4444' : '#22C55E'} fontSize="2xs" borderRadius="full" px={2}>
+                        <Badge bg={consensus.fraudDetected ? 'rgba(239,68,68,0.15)' : 'rgba(34,197,94,0.15)'} color={consensus.fraudDetected ? '#FCA5A5' : '#22C55E'} fontSize="2xs" borderRadius="full" px={2}>
                           {consensus.fraudDetected ? 'FRAUD DETECTED' : 'CLEAN'}
                         </Badge>
                       </HStack>
                       <Text color="white" fontWeight={700} fontSize="md">
-                        {consensus.fraudVotes}/{consensus.totalNodes} nodes agree — {consensus.consensusReached ? 'threshold met' : 'no consensus'}
+                        {consensus.fraudVotes}/{consensus.totalNodes} nodes agree — {consensus.consensusReached ? 'verdict confirmed' : 'no consensus'}
+                      </Text>
+                      <Text fontSize="2xs" color="rgba(255,255,255,0.4)">
+                        All nodes analyzed independently; the majority verdict stands as the final result.
                       </Text>
                     </VStack>
                     <HStack spacing={3}>
                       {consensus.nodeVotes?.map(v => (
                         <VStack key={v.id} spacing={0} px={3} py={2} bg="rgba(0,0,0,0.3)" borderRadius="lg" border="1px solid rgba(255,255,255,0.06)">
                           <Text fontSize="2xs" color="rgba(255,255,255,0.5)">Node {v.id}</Text>
-                          <Text fontSize="sm" fontWeight={800} color={v.fraud ? '#EF4444' : '#22C55E'}>{v.risk}</Text>
-                          <Text fontSize="2xs" color={v.fraud ? '#EF4444' : '#22C55E'}>{v.fraud ? 'FRAUD' : 'CLEAN'}</Text>
+                          <Text fontSize="sm" fontWeight={800} color={v.fraud ? '#FCA5A5' : '#22C55E'}>{v.risk}</Text>
+                          <Text fontSize="2xs" color={v.fraud ? '#FCA5A5' : '#22C55E'}>{v.fraud ? 'FRAUD' : 'CLEAN'}</Text>
                         </VStack>
                       ))}
                     </HStack>
@@ -368,15 +392,18 @@ export default function AuditFlowPage() {
                       <Text fontSize="xs" color="#A78BFA" textTransform="uppercase" letterSpacing="0.1em" fontWeight={700}>FROST Schnorr Signature</Text>
                       {signature.valid && <Badge bg="rgba(34,197,94,0.15)" color="#22C55E" fontSize="2xs" borderRadius="full" px={2}>VALID</Badge>}
                     </HStack>
+                    <Text fontSize="2xs" color="rgba(255,255,255,0.4)">
+                      A digital proof that at least 2 of 3 oracle nodes agreed on this verdict. The signature is mathematically unforgeable.
+                    </Text>
                     <SimpleGrid columns={{ base: 1, md: 2 }} spacing={3} w="full">
                       <Box>
-                        <Text fontSize="2xs" color="rgba(255,255,255,0.55)" mb={1}>R (Nonce Point)</Text>
+                        <Text fontSize="2xs" color="rgba(255,255,255,0.55)" mb={1}>R (Nonce Point) <Text as="span" color="rgba(255,255,255,0.3)">— random lock</Text></Text>
                         <Box p={2} bg="rgba(0,0,0,0.3)" borderRadius="md" border="1px solid rgba(167,139,250,0.15)">
                           <Text fontSize="2xs" fontFamily="mono" color="rgba(255,255,255,0.8)" wordBreak="break-all">{signature.R}</Text>
                         </Box>
                       </Box>
                       <Box>
-                        <Text fontSize="2xs" color="rgba(255,255,255,0.55)" mb={1}>s (Aggregated Scalar)</Text>
+                        <Text fontSize="2xs" color="rgba(255,255,255,0.55)" mb={1}>s (Aggregated Scalar) <Text as="span" color="rgba(255,255,255,0.3)">— combined key</Text></Text>
                         <Box p={2} bg="rgba(0,0,0,0.3)" borderRadius="md" border="1px solid rgba(167,139,250,0.15)">
                           <Text fontSize="2xs" fontFamily="mono" color="rgba(255,255,255,0.8)" wordBreak="break-all">{signature.s}</Text>
                         </Box>
@@ -401,20 +428,23 @@ export default function AuditFlowPage() {
                       <Text fontSize="xs" color="#FF6B2B" textTransform="uppercase" letterSpacing="0.1em" fontWeight={700}>Bitcoin Taproot Transaction</Text>
                       <Badge bg="rgba(255,107,43,0.15)" color="#FF9B51" fontSize="2xs" borderRadius="full" px={2}>OP_RETURN</Badge>
                     </HStack>
+                    <Text fontSize="2xs" color="rgba(255,255,255,0.4)">
+                      The verdict is written permanently to the Bitcoin blockchain. OP_RETURN stores the data, and Taproot is Bitcoin’s latest address format.
+                    </Text>
                     <SimpleGrid columns={{ base: 1, md: 2 }} spacing={3} w="full">
                       <Box>
-                        <Text fontSize="2xs" color="rgba(255,255,255,0.55)" mb={1}>TxID</Text>
+                        <Text fontSize="2xs" color="rgba(255,255,255,0.55)" mb={1}>TxID <Text as="span" color="rgba(255,255,255,0.3)">— unique receipt number</Text></Text>
                         <Text fontSize="2xs" fontFamily="mono" color="#FF9B51" wordBreak="break-all">{transaction.txId}</Text>
                       </Box>
                       <Box>
-                        <Text fontSize="2xs" color="rgba(255,255,255,0.55)" mb={1}>Verdict Inscription</Text>
+                        <Text fontSize="2xs" color="rgba(255,255,255,0.55)" mb={1}>Verdict Inscription <Text as="span" color="rgba(255,255,255,0.3)">— data stored on-chain</Text></Text>
                         <Text fontSize="2xs" fontFamily="mono" color="rgba(255,255,255,0.8)">{transaction.opReturn}</Text>
                       </Box>
                     </SimpleGrid>
                     <HStack spacing={3} flexWrap="wrap">
                       <Text fontSize="2xs" color="rgba(255,255,255,0.45)">Size: {transaction.size} bytes</Text>
                       <Divider orientation="vertical" h={3} borderColor="rgba(255,255,255,0.1)" />
-                      <Text fontSize="2xs" color="rgba(255,255,255,0.45)">P2TR: {transaction.taprootAddress?.slice(0, 14)}...</Text>
+                      <Text fontSize="2xs" color="rgba(255,255,255,0.45)">P2TR: {transaction.taprootAddress?.slice(0, 14)}... <Text as="span" color="rgba(255,255,255,0.3)">(Taproot address)</Text></Text>
                       <Divider orientation="vertical" h={3} borderColor="rgba(255,255,255,0.1)" />
                       <Text as="a" href={transaction.mempoolUrl} target="_blank" rel="noopener noreferrer"
                         fontSize="2xs" color="#5B7FFF" _hover={{ textDecoration: 'underline' }}>
@@ -427,12 +457,28 @@ export default function AuditFlowPage() {
             </MotionBox>
           )}
 
-          {/* Phase progress */}
+          {/* Phase complete — View Results */}
           {phase === 'COMPLETE' && (
-            <MotionBox initial={{ opacity: 0 }} animate={{ opacity: 1 }} textAlign="center" py={4}>
-              <Text color="#22C55E" fontWeight={700} fontSize="sm">
-                Audit finalized — redirecting to results...
-              </Text>
+            <MotionBox initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} textAlign="center" py={6}>
+              <VStack spacing={4}>
+                <Text color="#22C55E" fontWeight={700} fontSize="md">
+                  Audit Complete — All oracle nodes reached consensus
+                </Text>
+                <Button
+                  onClick={() => navigate('/results')}
+                  className="shimmer-btn"
+                  bg="linear-gradient(135deg, #22C55E, #5B7FFF)"
+                  color="white"
+                  fontWeight={700}
+                  size="lg"
+                  px={10}
+                  borderRadius="12px"
+                  _hover={{ opacity: 0.9, transform: 'scale(1.02)' }}
+                  transition="all 0.2s"
+                >
+                  View Results →
+                </Button>
+              </VStack>
             </MotionBox>
           )}
         </VStack>

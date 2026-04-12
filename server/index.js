@@ -12,6 +12,8 @@ import auditRoutes from './routes/audit.js'
 import secRoutes from './routes/sec.js'
 import oracleRoutes from './routes/oracle.js'
 import satelliteRoutes from './routes/satellite.js'
+import bountyRoutes from './routes/bounty.js'
+import lightningRoutes from './routes/lightning.js'
 
 // Load environment variables
 const app = express()
@@ -40,6 +42,8 @@ app.use('/api/audit', auditRoutes)
 app.use('/api/sec', secRoutes)
 app.use('/api/oracle', oracleRoutes)
 app.use('/api/satellite', satelliteRoutes)
+app.use('/api/bounty', bountyRoutes)
+app.use('/api/lightning', lightningRoutes)
 
 // Error handling middleware
 app.use((err, req, res, next) => {
@@ -83,6 +87,10 @@ app.listen(PORT, () => {
   console.log('  GET  /api/oracle/info            - Oracle status')
   console.log('  POST /api/oracle/broadcast       - Broadcast to testnet')
   console.log('  POST /api/satellite/power        - NASA POWER satellite data')
+  console.log('  POST /api/bounty/create           - Create investigation bounty')
+  console.log('  GET  /api/bounty/marketplace      - List bounties')
+  console.log('  POST /api/bounty/psbt/create      - Create PSBT')
+  console.log('  GET  /api/bounty/opreturn/chain   - OP_RETURN verdict chain')
 })
 
 export default app

@@ -115,7 +115,7 @@ Return ONLY valid JSON in this exact format — no markdown, no explanation:
             : [`Renewable energy at ${renewPct}% aligned with clean grid standards`, `CO₂ intensity (${co2} lbs/MWh) is within acceptable range`],
           narrative: `${company}'s ESG claims were analyzed against federal data. EIA reports ${renewPct}% renewable energy in the operating region, while EPA eGRID shows a CO₂ emission rate of ${co2} lbs/MWh (national average: ${nationalAvg}). ${isGreenwashing ? 'Significant contradictions detected between claims and actual environmental performance.' : 'Data broadly supports the company\'s environmental claims.'} Risk score: ${riskScore}/100.`,
         },
-        narrative: `${company}'s ESG claim contradicts federal data. EIA reports only ${gap}% renewable capacity.`,
+        narrative: `${company}'s ESG claim contradicts federal data. EIA reports only ${renewPct}% renewable capacity.`,
         model: 'llama-3.3-70b-versatile',
         dataSource: 'Groq Fallback',
         timestamp: new Date().toISOString(),

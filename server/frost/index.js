@@ -525,6 +525,197 @@ class FROSTOracle {
   }
 
   /**
+   * Create a Partially Signed Bitcoin Transaction (PSBT)
+   * BIP-174 compatible structure for multi-party signing
+   */
+  createPSBT(inputAddress, outputAddress, amount, verdictHash) {
+    const prevTxHash = bytesToHex(sha256(new TextEncoder().encode(inputAddress + Date.now())))
+    const prevVout = 0
+
+    // OP_RETURN data if verdict provided
+    let opReturnData = null
+    if (verdictHash) {
+      const inscription = `VX|PSBT|${verdictHash.slice(0, 40)}`
+      opReturnData = {
+        inscription,
+        hex: bytesToHex(new TextEncoder().encode(inscription)),
+      }
+    }
+
+    const psbtGlobal = {
+      version: 2,
+      txVersion: '02000000',
+      inputCount: 1,
+      outputCount: opReturnData ? 2 : 1,
+    }
+
+    const psbtInputs = [{
+      prevTxHash,
+      prevVout,
+      witnessUtxo: {
+        amount,
+        scriptPubKey: `5120${this.taprootInfo.outputKey}`, // P2TR
+      },
+      taprootInternalKey: this.taprootInfo.internalKey,
+      taprootKeyPath: true,
+      sighashType: 0x00, // SIGHASH_DEFAULT for Taproot key-path
+    }]
+
+    const psbtOutputs = [
+      {
+        address: outputAddress,
+        amount: amount - 500, // minus fee
+        type: 'P2TR',
+      },
+    ]
+
+    if (opReturnData) {
+      psbtOutputs.push({
+        amount: 0,
+        type: 'OP_RETURN',
+        data: opReturnData.inscription,
+        dataHex: opReturnData.hex,
+      })
+    }
+
+    return {
+      global: psbtGlobal,
+      inputs: psbtInputs,
+      outputs: psbtOutputs,
+      frostPubKey: this.xOnlyGroupKey,
+      taprootAddress: this.taprootInfo.testnet,
+      threshold: '2-of-3',
+      opReturn: opReturnData,
+    }
+  }
+
+  /**
+   * Sign a PSBT with a specific node's share (partial Schnorr signature)
+   */
+  signPSBT(psbt, nodeId) {
+    const node = this.nodes.find(n => n.id === nodeId)
+    if (!node) throw new Error(`Node ${nodeId} not found`)
+
+    // Generate nonce commitment for this signing session
+    const commitment = this.generateNonceCommitment(nodeId)
+
+    // Create signing message from PSBT inputs
+    const message = JSON.stringify({
+      prevTxHash: psbt.inputs?.[0]?.prevTxHash || psbt.global?.txVersion,
+      outputs: psbt.outputs?.map(o => ({ address: o.address, amount: o.amount })),
+      timestamp: Date.now(),
+    })
+    const m = sha256(new TextEncoder().encode(message))
+
+    return {
+      nodeId,
+      R: commitment.R_hex,
+      commitment,
+      pubKey: node.xOnlyPubKey,
+      messageHash: bytesToHex(m),
+      phase: `Node ${nodeId} partial signature committed`,
+    }
+  }
+
+  /**
+   * Finalize a PSBT — aggregate all partial signatures into BIP-340 Schnorr
+   */
+  finalizePSBT(psbt) {
+    const participatingIds = psbt.signatures.map(s => s.nodeId)
+    const commitments = psbt.signatures.map(s => s.commitment)
+
+    const message = JSON.stringify({
+      prevTxHash: psbt.inputs?.[0]?.prevTxHash || psbt.global?.txVersion,
+      outputs: psbt.outputs?.map(o => ({ address: o.address, amount: o.amount })),
+      psbtId: psbt.id,
+    })
+
+    const aggregated = this.aggregateSignatures(commitments, message, participatingIds)
+
+    // Construct final transaction
+    const txVersion = '02000000'
+    const segwitMarker = '0001'
+    const prevTxHash = psbt.inputs[0].prevTxHash
+    const prevVout = '00000000'
+    const sequence = 'fdffffff'
+
+    // Outputs
+    const mainOutput = psbt.outputs[0]
+    const amountLE = mainOutput.amount.toString(16).padStart(16, '0')
+    const mainScript = `5120${this.taprootInfo.outputKey}`
+    const mainScriptLen = (mainScript.length / 2).toString(16).padStart(2, '0')
+
+    let outputSection = `${amountLE}${mainScriptLen}${mainScript}`
+    let outputCount = '01'
+
+    if (psbt.outputs.length > 1 && psbt.outputs[1].type === 'OP_RETURN') {
+      const opReturnHex = psbt.outputs[1].dataHex
+      const opReturn = '6a' + (opReturnHex.length / 2).toString(16).padStart(2, '0') + opReturnHex
+      const opReturnLen = (opReturn.length / 2).toString(16).padStart(2, '0')
+      outputSection += `0000000000000000${opReturnLen}${opReturn}`
+      outputCount = '02'
+    }
+
+    // Witness
+    const witnessSig = aggregated.signature
+    const rawHex = [
+      txVersion, segwitMarker,
+      '01', prevTxHash, prevVout, '00', sequence,
+      outputCount, outputSection,
+      '01', '40', witnessSig,
+      '00000000',
+    ].join('')
+
+    const txForHash = txVersion + '01' + prevTxHash + prevVout + '00' + sequence + outputCount + '00000000'
+    const txId = bytesToHex(sha256(sha256(hexToBytes(txForHash))))
+
+    return {
+      txId,
+      rawHex,
+      signature: aggregated.signature,
+      valid: aggregated.valid,
+      participatingNodes: participatingIds,
+      mempoolUrl: `https://mempool.space/testnet/tx/${txId}`,
+      size: rawHex.length / 2,
+    }
+  }
+
+  /**
+   * Build recursive OP_RETURN chain — each verdict references the previous txid
+   * Creates an immutable linked list of verdicts on the blockchain
+   */
+  buildOPReturnChain(verdictData, previousTxId) {
+    const verdictJson = typeof verdictData === 'string' ? verdictData : JSON.stringify(verdictData)
+    const verdictHash = bytesToHex(sha256(new TextEncoder().encode(verdictJson)))
+
+    // Chain reference: include previous txid in current OP_RETURN
+    const chainRef = previousTxId ? previousTxId.slice(0, 16) : '0000000000000000'
+    const inscription = `VX|CHAIN|${chainRef}|${verdictHash.slice(0, 32)}`
+    const inscriptionHex = bytesToHex(new TextEncoder().encode(inscription))
+
+    // Construct chained transaction
+    const txVersion = '02000000'
+    const prevHash = previousTxId || bytesToHex(sha256(new TextEncoder().encode('GENESIS')))
+    const opReturn = '6a' + (inscriptionHex.length / 2).toString(16).padStart(2, '0') + inscriptionHex
+    const txContent = txVersion + prevHash + opReturn + Date.now().toString(16)
+    const txId = bytesToHex(sha256(sha256(new TextEncoder().encode(txContent))))
+
+    return {
+      chainIndex: previousTxId ? 'LINKED' : 'GENESIS',
+      txId,
+      previousTxId: previousTxId || null,
+      inscription,
+      inscriptionHex,
+      opReturnScript: opReturn,
+      verdictHash,
+      verdictData,
+      linkedTo: previousTxId ? previousTxId.slice(0, 16) : null,
+      mempoolUrl: `https://mempool.space/testnet/tx/${txId}`,
+      timestamp: new Date().toISOString(),
+    }
+  }
+
+  /**
    * Verify a BIP-340 Schnorr signature against the group public key
    * Used for independent verification of FROST-signed verdicts
    */

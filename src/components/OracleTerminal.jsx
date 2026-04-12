@@ -34,7 +34,7 @@ const STATUS_COLORS = {
   waiting: '#6B7280',
   running: '#FBBF24',
   done: '#22C55E',
-  error: '#EF4444',
+  error: '#FCA5A5',
 }
 
 const NODE_COLORS = {

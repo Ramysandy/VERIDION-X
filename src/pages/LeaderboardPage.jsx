@@ -79,7 +79,7 @@ export default function LeaderboardPage() {
                     <Heading as="h1" size="xl" className="gradient-text" fontFamily="heading">
                       Hall of Shame
                     </Heading>
-                    <Badge bg="rgba(239,68,68,0.15)" color="#EF4444" borderRadius="full" px={3} fontSize="xs">
+                    <Badge bg="rgba(239,68,68,0.15)" color="#FCA5A5" borderRadius="full" px={3} fontSize="xs">
                       LIVE
                     </Badge>
                   </HStack>
@@ -96,7 +96,7 @@ export default function LeaderboardPage() {
                   </Button>
                   {entries.length > 0 && (
                     <Button size="sm" variant="outline"
-                      borderColor="rgba(239,68,68,0.3)" color="#EF4444"
+                      borderColor="rgba(239,68,68,0.3)" color="#FCA5A5"
                       _hover={{ bg: 'rgba(239,68,68,0.08)' }}
                       leftIcon={<DeleteIcon />} onClick={clearAll}>
                       Clear All
@@ -112,9 +112,9 @@ export default function LeaderboardPage() {
                 <SimpleGrid columns={{ base: 2, md: 4 }} spacing={3}>
                   {[
                     { label: 'Total Audits', value: topStats.total, color: '#FF6B2B' },
-                    { label: 'Greenwashers Caught', value: topStats.greenwashers, color: '#EF4444' },
+                    { label: 'Greenwashers Caught', value: topStats.greenwashers, color: '#FCA5A5' },
                     { label: 'Avg Risk Score', value: `${topStats.avgRisk}/100`, color: '#FF6B2B' },
-                    { label: 'Critical Alerts', value: topStats.criticalCount, color: '#EF4444' },
+                    { label: 'Critical Alerts', value: topStats.criticalCount, color: '#FCA5A5' },
                   ].map(({ label, value, color }) => (
                     <MotionBox key={label} variants={fadeUp}>
                       <Card className="glass" border="1px solid rgba(255,107,43,0.1)">
@@ -195,7 +195,7 @@ export default function LeaderboardPage() {
                             <Td>
                               <Badge
                                 bg={entry.verdict?.winner ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)'}
-                                color={entry.verdict?.winner ? '#22C55E' : '#EF4444'}
+                                color={entry.verdict?.winner ? '#22C55E' : '#FCA5A5'}
                                 borderRadius="full" fontSize="9px" px={2}>
                                 {entry.verdict?.aiVerdict || (entry.verdict?.winner ? 'VERIFIED' : 'GREENWASHING')}
                               </Badge>
@@ -208,7 +208,7 @@ export default function LeaderboardPage() {
                                   ? 'rgba(251,191,36,0.12)'
                                   : 'rgba(34,197,94,0.12)'}
                                 color={entry.verdict?.riskLevel === 'CRITICAL' || entry.verdict?.riskLevel === 'HIGH'
-                                  ? '#EF4444'
+                                  ? '#FCA5A5'
                                   : entry.verdict?.riskLevel === 'MEDIUM'
                                   ? '#FBBF24'
                                   : '#22C55E'}
@@ -218,7 +218,7 @@ export default function LeaderboardPage() {
                             </Td>
                             <Td isNumeric>
                               <Text fontWeight={800}
-                                color={entry.verdict?.riskScore > 70 ? '#EF4444' : entry.verdict?.riskScore > 40 ? '#FBBF24' : '#22C55E'}
+                                color={entry.verdict?.riskScore > 70 ? '#FCA5A5' : entry.verdict?.riskScore > 40 ? '#FBBF24' : '#22C55E'}
                                 fontSize="sm">
                                 {entry.verdict?.riskScore ?? '\u2014'}/100
                               </Text>
