@@ -188,7 +188,7 @@ export default function AuditFlowPage() {
               fetch(`${apiUrl}/lightning/pay-bounty`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ paymentRequest: invoice.paymentRequest }),
+                body: JSON.stringify({ paymentRequest: invoice.paymentRequest, paymentHash: invoice.paymentHash }),
               }).catch(() => {/* non-fatal */})
             }
           }
