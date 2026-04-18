@@ -355,7 +355,7 @@ POST /api/groq/analyze         { company, eiaData, epaData, secData }
 
 ---
 
-## 🏆 Hackathon Pitch
+## About us
 
 > *"ESG fraud is a $3.5 trillion problem. Billions are wasted on fake green credentials every year. We built a bounty marketplace where investigators earn Bitcoin Lightning payments for auditing companies against real government data — EIA, EPA, SEC, NASA. If they find contradictions, it's flagged as greenwashing.*
 >
